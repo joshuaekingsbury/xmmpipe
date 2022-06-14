@@ -70,13 +70,30 @@ if [ "$answer" != "${answer#[Yy]}" ] ;then # this grammar (the #[] operator) mea
 
     mos-filter | tee ./_log_mos-filter.txt
 
+    # Get list of files containing *-obj-image-det-soft.fits
+    # For each one get instrument name, exposure id; save out detector soft band image
+    shopt -s nullglob
+    mosFiles=( mos*-obj-image-det-soft.fits )
+    #echo ${mosFiles[@]}
+    for f in ${mosFiles[@]}; do
+        instrume=$(gethead INSTRUME "$f")
+        instrume="${instrume:1}"
+        instrume=$(echo "$instrume" | tr '[:upper:]' '[:lower:]')
+        expid=$(gethead EXPIDSTR "$f")
+
+        ds9 "./$f" -scale log -cmap sls -zoom to fit -saveimage png "./$instrume$expid-det-soft.png" -exit &
+        wait $!
+        echo "Saved image as: $instrume$expid"
+    done
+    shopt -u nullglob
+
     wait $!
 
     ## Should log output from mos-filter regarding potentially anomolous ccds
 
 else
     echo No
-    break;
+    continue
 fi
 
 # cheese prefixm=1S001 scale=0.20 mask=1 rate=0.01 rates=0.01 rateh=0.01 dist=15.0 clobber=1 elow=300 ehigh=7000
