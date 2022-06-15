@@ -76,9 +76,9 @@ if [ "$answer" != "${answer#[Yy]}" ] ;then # this grammar (the #[] operator) mea
     mosFiles=( mos*-obj-image-det-soft.fits )
     #echo ${mosFiles[@]}
     for f in ${mosFiles[@]}; do
-        instrume=$(gethead INSTRUME "$f")
-        instrume="${instrume:1}"
-        instrume=$(echo "$instrume" | tr '[:upper:]' '[:lower:]')
+        instrume=$(gethead INSTRUME "$f") # EMOS1, EMOS2, EPN
+        instrume="${instrume:1}" # MOS1, MOS2, PN
+        instrume=$(echo "$instrume" | tr '[:upper:]' '[:lower:]') # mos1, mos2, pn
         expid=$(gethead EXPIDSTR "$f")
 
         ds9 "./$f" -scale log -cmap sls -zoom to fit -saveimage png "./$instrume$expid-det-soft.png" -exit &
@@ -101,7 +101,8 @@ fi
 # xmmselect table=mos1S001-clean.fits%EVENTS
 
 # mos-spectra prefix=1S001 caldb=$ESAS_CALDB region=mos1reg.txt mask=0 elow=300 ehigh=5000 ccd1=1 ccd2=1 ccd3=1 ccd4=1 ccd5=1 ccd6=1 ccd7=1
-
+# pn-spectra prefix=S003 caldb=$ESAS_CALDB region=mos1reg.txt mask=0 elow=300 ehigh=5000 quad1=1 quad2=1 quad3=1 quad4=1
+# pn-spectra prefix=S003 caldb=$ESAS_CALDB region=pnS003_backtest.txt mask=0 elow=300 ehigh=5000 quad1=1 quad2=1 quad3=1 quad4=1
 
 
 
