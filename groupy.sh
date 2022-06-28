@@ -7,21 +7,23 @@
 
 ## Ask inst and offer options
 inst=$1
+suffix=${2:-""}
+group=${3:-25}
 if [[ "${line:0:1}" == "p" ]]; then
-    inFile=${inst}"-obj-os.pi"
+    inFile=${inst}"-obj-os$suffix.pi"
 else
-    inFile=${inst}"-obj.pi"
+    inFile=${inst}"-obj$suffix.pi"
 fi
-outFile=${inst}"-obj-grp.pi"
-arfFile=${inst}".arf"
-rmfFile=${inst}".rmf"
-nxbFile=${inst}"-back.pi"
+outFile=${inst}"-obj-grp$suffix.pi"
+arfFile=${inst}"$suffix.arf"
+rmfFile=${inst}"$suffix.rmf"
+nxbFile=${inst}"-back$suffix.pi"
 
 _CURRENT_DIR=${PWD##*/}
 
 if [ $_CURRENT_DIR == "analysis" ]; then
 
-    grppha infile=./${inFile} outfile=${outFile} clobber=yes comm="chkey ANCRFILE ./$arfFile & chkey RESPFILE ./$rmfFile & chkey BACKFILE ./$nxbFile & group min 25 & exit"
+    grppha infile=./${inFile} outfile=${outFile} clobber=yes comm="chkey ANCRFILE ./$arfFile & chkey RESPFILE ./$rmfFile & chkey BACKFILE ./$nxbFile & group min $group & exit"
 
     grppha infile=${outFile} outfile=${outFile} clobber=yes comm="show all & exit"
 
