@@ -90,10 +90,13 @@ if [ "$answer" != "${answer#[Yy]}" ] ;then # this grammar (the #[] operator) mea
     wait $!
 
     ## Should log output from mos-filter regarding potentially anomolous ccds
+    pushd ..
+    zip -r filtered.zip analysis
+    popd
 
 else
     echo No
-    continue
+    return 1 2> /dev/null || exit 1
 fi
 
 # cheese prefixm=1S001 scale=0.20 mask=1 rate=0.01 rates=0.01 rateh=0.01 dist=15.0 clobber=1 elow=300 ehigh=7000
