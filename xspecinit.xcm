@@ -1,0 +1,13 @@
+ignore 0.0-0.3 7.0-**
+
+cpd /xw
+
+setplot energy
+
+setplot add
+
+setplot command r y 2e-5 2
+
+plot ldata
+
+

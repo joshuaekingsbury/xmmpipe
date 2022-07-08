@@ -71,22 +71,20 @@ fi
 
 # ./sky2det.sh mos1S001-obj-image-sky.fits ds9.reg
 
-
 # List region files in file
 while read -r line
 do
 
     for f in ${det_files[@]}; do
 
-        ./sky2det.sh "$f" "$line.reg"
+        ./xmm_sky2det_regions.sh "$f" "$line.reg"
         echo 
         echo "$line: ${f%%\-*}"
 
     done
 
     echo
-    #echo "$line$found"
+    echo "$line$found"
 done < "$region_files_list"
-
 
 shopt -u nullglob
