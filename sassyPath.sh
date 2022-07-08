@@ -89,6 +89,10 @@ if [ "$answer" != "${answer#[Yy]}" ] ;then # this grammar (the #[] operator) mea
 
     wait $!
 
+    rm -f *FIT # From XMM ESAS Cookbook
+
+    wait $!
+
     ## Should log output from mos-filter regarding potentially anomolous ccds
     pushd ..
     zip -r filtered.zip analysis

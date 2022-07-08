@@ -19,6 +19,9 @@ pushd ..
 if [[ ! -d spectral_products ]]; then
     mkdir spectral_products
 fi
+if [[ ! -d intermediates ]]; then
+    mkdir intermediates
+fi
 popd
 
 
@@ -52,182 +55,278 @@ else
     return 1 2> /dev/null || exit 1
 fi
 
+# List detectors and exposures found
+echo
+echo "Detectors and Exposures Found:"
+echo
+
+# Get list of files containing *-obj-image-sky.fits
+det_files=( *-obj-image-sky.fits )
+exp_select=()
+#echo ${mosFiles[@]}
+for f in ${det_files[@]}; do
+
+    instrume=$(gethead INSTRUME "$f") # EMOS1, EMOS2, EPN
+    instrume="${instrume:1}" # MOS1, MOS2, PN
+    instrume=$(echo "$instrume" | tr '[:upper:]' '[:lower:]') # mos1, mos2, pn
+    expid=$(gethead EXPIDSTR "$f")
+
+    if [[ "$instrume" == "$detector" || "$detector" == "all" ]]; then
+        echo "$instrume$expid"
+        exp_select+="$instrume$expid"
+    fi
+
+done
+
+# List detectors and exposures found
+echo
+echo "Detectors and Exposures Selected for Detector <$detector>:"
+echo
+
+for f in ${exp_select[@]}; do
+
+    echo "$f"
+
+done
+
+echo
+echo -n "Continue with the selected detector(s) and exposure(s)?"
+read answer
+
+if [ "$answer" != "${answer#[Yy]}" ] ;then # this grammar (the #[] operator) means that the variable $answer where any Y or y in 1st position will be dropped if they exist.
+    echo Yes
+    echo
+else
+    echo No
+    return 1 2> /dev/null || exit 1
+fi
+
+ls >> pre_inventory.txt
+
 # mos-spectra prefix=1S001 caldb=$ESAS_CALDB region=mos1reg.txt mask=0 elow=300 ehigh=5000 ccd1=1 ccd2=1 ccd3=1 ccd4=1 ccd5=1 ccd6=1 ccd7=1
 # pn-spectra prefix=S003 caldb=$ESAS_CALDB region=mos1reg.txt mask=0 elow=300 ehigh=5000 quad1=1 quad2=1 quad3=1 quad4=1
 # pn-spectra prefix=S003 caldb=$ESAS_CALDB region=pnS003_backtest.txt mask=0 elow=300 ehigh=5000 quad1=1 quad2=1 quad3=1 quad4=1
 
 while read -r -u 3 line
 do
-    # SAS_CLOBBER=1
-    # SAS_VERB=0
+    for e in ${exp_select[@]}; do
+        exposure=""
+        spectra_continue=false
+        # MOS1
+        if [[ "${e%%"S"*}" == "mos1" ]]; then
+            # Since we know detector is mosX; get XXX-spectra prefix by creating substring
+            exposure="${e:3}"
 
-    # MOS1
-    if [[ "$detector" == "mos1" || "$detector" == "all" ]]; then
-        if [[ -f "mos1S001-obj.pi" ]]; then
+            if [[ -f "$e-obj.pi" ]]; then
 
-            echo "Found mos1S001-obj.pi"
-            echo "Skipping run of mos-spectra as it won't overwrite."
-            echo "Either clear all mos-spectra output or start over."
+                echo "Found $e-obj.pi"
+                echo "Skipping run of mos-spectra as it won't overwrite."
+                echo "Either clear all mos-spectra output or start over."
 
-        elif [[ -f "mos1S001-obj-$line.pi" ]]; then
+            elif [[ -f "$e-obj-$line.pi" ]]; then
 
-            echo "Found mos1S001-obj-$line.pi. This will be overwritten if script continues."
-            echo -n "Continue and overwrite mos1S001-obj-$line.pi?"
-            read -p "" answer
+                echo "Found $e-obj-$line.pi. This will be overwritten if script continues."
+                echo -n "Continue and overwrite $e-obj-$line.pi?"
+                read -p "" answer
 
-            if [ "$answer" != "${answer#[Yy]}" ] ;then # this grammar (the #[] operator) means that the variable $answer where any Y or y in 1st position will be dropped if they exist.
-                echo Yes
-                mos-spectra prefix=1S001 caldb=$ESAS_CALDB region="mos1S001_$line.txt" mask=0 elow=300 ehigh=7000 ccd1=1 ccd2=1 ccd3=1 ccd4=1 ccd5=1 ccd6=1 ccd7=1
+                if [ "$answer" != "${answer#[Yy]}" ] ;then # this grammar (the #[] operator) means that the variable $answer where any Y or y in 1st position will be dropped if they exist.
+                    echo Yes
+                    spectra_continue=true
+                else
+                    echo No
+                    return 1 2> /dev/null || exit 1
+                fi
+
             else
-                echo No
+                spectra_continue=true
+            fi
+
+            if [[ $spectra_continue == true ]]; then
+                if [[ "${e:3:1}" == 1 ]]; then
+                    mos-spectra prefix=$exposure caldb=$ESAS_CALDB region="$e_$line.txt" mask=0 elow=300 ehigh=7000 ccd1=1 ccd2=1 ccd3=1 ccd4=1 ccd5=1 ccd6=1 ccd7=1
+                elif [[ "${e:3:1}" == 2 ]]; then
+                    mos-spectra prefix=$exposure caldb=$ESAS_CALDB region="$e_$line.txt" mask=0 elow=300 ehigh=7000 ccd1=1 ccd2=1 ccd3=1 ccd4=1 ccd5=1 ccd6=1 ccd7=1
+                fi
+            fi
+
+            wait $!
+
+            if [[ ! -f "$e-obj.pi" ]]; then
+                echo "Output from mos-spectra not found for $e. Aborting mos_back and script."
+                return 1 2> /dev/null || exit 1
+            fi    
+
+            if [[ "${e:3:1}" == 1 ]]; then
+                mos_back prefix=$exposure caldb=$ESAS_CALDB diag=0 elow=300 ehigh=7000 ccd1=1 ccd2=1 ccd3=1 ccd4=1 ccd5=1 ccd6=1 ccd7=1
+            elif [[ "${e:3:1}" == 2 ]]; then
+                mos_back prefix=$exposure caldb=$ESAS_CALDB diag=0 elow=300 ehigh=7000 ccd1=1 ccd2=1 ccd3=1 ccd4=1 ccd5=1 ccd6=1 ccd7=1
+            fi
+
+
+            if [[ ! -f "$e-back.pi" ]]; then
+                echo "Output from mos_back not found for $e. Aborting file renaming and grppha."
                 return 1 2> /dev/null || exit 1
             fi
 
-        else
-            mos-spectra prefix=1S001 caldb=$ESAS_CALDB region="mos1S001_$line.txt" mask=0 elow=300 ehigh=7000 ccd1=1 ccd2=1 ccd3=1 ccd4=1 ccd5=1 ccd6=1 ccd7=1
+            mv $e-obj.pi "$e-obj-$line.pi"
+            mv $e-back.pi "$e-back-$line.pi"
+            mv $e.rmf "$e-$line.rmf"
+            mv $e.arf "$e-$line.arf"
+            mv $e-obj-im-sp-det.fits "$e-sp-$line.fits"
+
+            . groupy.sh $e "-$line"
+
+            mv *-$line* ../spectral_products
+
         fi
 
-        wait $!
+        # # MOS2
+        # if [[ "${f%%"S"*}" == "mos2" ]]; then
+        #     # Since we know detector is mosX; get XXX-spectra prefix by creating substring
+        #     exposure="${e:3}"
 
-        if [[ ! -f "mos1S001-obj.pi" ]]; then
-            echo "Output from mos-spectra not found for mos1S001. Aborting mos_back and script."
-            return 1 2> /dev/null || exit 1
-        fi    
+        #     if [[ -f "mos2S002-obj.pi" ]]; then
 
-        mos_back prefix=1S001 caldb=$ESAS_CALDB diag=0 elow=300 ehigh=7000 ccd1=1 ccd2=1 ccd3=1 ccd4=1 ccd5=1 ccd6=1 ccd7=1
+        #         echo "Found mos2S002-obj.pi"
+        #         echo "Skipping run of mos-spectra as it won't overwrite."
+        #         echo "Either clear all mos-spectra output or start over."
 
-        if [[ ! -f "mos1S001-back.pi" ]]; then
-            echo "Output from mos_back not found for mos1S001. Aborting file renaming and grppha."
-            return 1 2> /dev/null || exit 1
-        fi
+        #     elif [[ -f "mos2S002-obj-$line.pi" ]]; then
 
-        mv mos1S001-obj.pi "mos1S001-obj-$line.pi"
-        mv mos1S001-back.pi "mos1S001-back-$line.pi"
-        mv mos1S001.rmf "mos1S001-$line.rmf"
-        mv mos1S001.arf "mos1S001-$line.arf"
-        mv mos1S001-obj-im-sp-det.fits "mos1S001-sp-$line.fits"
+        #         echo "Found mos2S002-obj-$line.pi. This will be overwritten if script continues."
+        #         echo -n "Continue and overwrite mos2S002-obj-$line.pi?"
+        #         read -p "" answer
 
-        . groupy.sh mos1S001 "-$line"
+        #         if [ "$answer" != "${answer#[Yy]}" ] ;then # this grammar (the #[] operator) means that the variable $answer where any Y or y in 1st position will be dropped if they exist.
+        #             echo Yes
+        #             mos-spectra prefix=2S002 caldb=$ESAS_CALDB region="mos2S002_$line.txt" mask=0 elow=300 ehigh=7000 ccd1=1 ccd2=1 ccd3=1 ccd4=1 ccd5=0 ccd6=1 ccd7=1
+        #         else
+        #             echo No
+        #             return 1 2> /dev/null || exit 1
+        #         fi
 
-        mv *-$line* ../spectral_products
+        #     else
+        #         mos-spectra prefix=2S002 caldb=$ESAS_CALDB region="mos2S002_$line.txt" mask=0 elow=300 ehigh=7000 ccd1=1 ccd2=1 ccd3=1 ccd4=1 ccd5=0 ccd6=1 ccd7=1
+        #     fi
 
-    fi
+        #     wait $!
 
-    # MOS2
-    if [[ "$detector" == "mos2" || "$detector" == "all" ]]; then
+        #     if [[ ! -f "mos2S002-obj.pi" ]]; then
+        #         echo "Output from mos-spectra not found for mos2S002. Aborting mos_back and script."
+        #         return 1 2> /dev/null || exit 1
+        #     fi  
 
-        if [[ -f "mos2S002-obj.pi" ]]; then
+        #     mos_back prefix=2S002 caldb=$ESAS_CALDB diag=0 elow=300 ehigh=7000 ccd1=1 ccd2=1 ccd3=1 ccd4=1 ccd5=0 ccd6=1 ccd7=1
 
-            echo "Found mos2S002-obj.pi"
-            echo "Skipping run of mos-spectra as it won't overwrite."
-            echo "Either clear all mos-spectra output or start over."
+        #     wait $!
 
-        elif [[ -f "mos2S002-obj-$line.pi" ]]; then
+        #     if [[ ! -f "mos2S002-back.pi" ]]; then
+        #         echo "Output from mos_back not found for mos2S002. Aborting file renaming and grppha."
+        #         return 1 2> /dev/null || exit 1
+        #     fi
 
-            echo "Found mos2S002-obj-$line.pi. This will be overwritten if script continues."
-            echo -n "Continue and overwrite mos2S002-obj-$line.pi?"
-            read -p "" answer
+        #     mv mos2S002-obj.pi "mos2S002-obj-$line.pi"
+        #     mv mos2S002-back.pi "mos2S002-back-$line.pi"
+        #     mv mos2S002.rmf "mos2S002-$line.rmf"
+        #     mv mos2S002.arf "mos2S002-$line.arf"
+        #     mv mos2S002-obj-im-sp-det.fits "mos2S002-sp-$line.fits"
 
-            if [ "$answer" != "${answer#[Yy]}" ] ;then # this grammar (the #[] operator) means that the variable $answer where any Y or y in 1st position will be dropped if they exist.
-                echo Yes
-                mos-spectra prefix=2S002 caldb=$ESAS_CALDB region="mos2S002_$line.txt" mask=0 elow=300 ehigh=7000 ccd1=1 ccd2=1 ccd3=1 ccd4=1 ccd5=0 ccd6=1 ccd7=1
+        #     . groupy.sh mos2S002 "-$line"
+
+        #     mv *-$line* ../spectral_products
+        # fi
+
+        # pn
+        if [[ "${e%%"S"*}" == "pn" ]]; then
+            # Since we know detector is pn; get XXX-spectra prefix by creating substring
+            exposure="${e:2}"
+
+            if [[ -f "$e-obj.pi" ]]; then
+
+                echo "Found $e-obj.pi"
+                echo "Skipping run of pn-spectra as it won't overwrite."
+                echo "Either clear all pn-spectra output or start over."
+
+            elif [[ -f "$e-obj-$line.pi" ]]; then
+
+                echo "Found $e-obj-$line.pi. This will be overwritten if script continues."
+                echo -n "Continue and overwrite $e-obj-$line.pi?"
+                read -p "" answer
+
+                if [ "$answer" != "${answer#[Yy]}" ] ;then # this grammar (the #[] operator) means that the variable $answer where any Y or y in 1st position will be dropped if they exist.
+                    echo Yes
+                    spectra_continue=true
+                else
+                    echo No
+                    return 1 2> /dev/null || exit 1
+                fi
+
             else
-                echo No
+                spectra_continue=true
+            fi
+
+            if [[ $spectra_continue == true ]]; then
+                pn-spectra prefix=$exposure caldb=$ESAS_CALDB region="$e_$line.txt" mask=0 elow=300 ehigh=7000 quad1=1 quad2=1 quad3=1 quad4=1
+            fi
+
+            wait $!
+
+            if [[ ! -f "$e-obj.pi" ]]; then
+                echo "Output from pn-spectra not found. Aborting mos_back and script."
+                return 1 2> /dev/null || exit 1
+            fi  
+
+            pn_back prefix=$exposure caldb=$ESAS_CALDB diag=0 elow=300 ehigh=7000 quad1=1 quad2=1 quad3=1 quad4=1
+
+            wait $!
+
+            if [[ ! -f "$e-back.pi" ]]; then
+                echo "Output from pn_back not found. Aborting file renaming and grppha."
                 return 1 2> /dev/null || exit 1
             fi
 
-        else
-            mos-spectra prefix=2S002 caldb=$ESAS_CALDB region="mos2S002_$line.txt" mask=0 elow=300 ehigh=7000 ccd1=1 ccd2=1 ccd3=1 ccd4=1 ccd5=0 ccd6=1 ccd7=1
+            mv $e-obj.pi "$e-obj-$line.pi"
+            mv $e-back.pi "$e-back-$line.pi"
+            mv $e.rmf "$e-$line.rmf"
+            mv $e.arf "$e-$line.arf"
+            mv $e-obj-im-sp-det.fits "$e-sp-$line.fits"
+            mv $e-obj-os.pi "$e-obj-os-$line.pi"
+
+            . groupy.sh $e "-$line"
+
+            mv *-$line* ../spectral_products
         fi
 
-        wait $!
+        cp *-mask-im.fits ../intermediates
+        cp *-mask-im-*0.fits ../intermediates
+        cp *-obj-im.fits ../intermediates
+        cp *-obj-im-*0.fits ../intermediates
+        cp *.txt ../intermediates
+        cp *.reg ../intermediates
+        cp *.jpeg ../intermediates
+        cp *.png ../intermediates
+        cp *.jpg ../intermediates
 
-        if [[ ! -f "mos2S002-obj.pi" ]]; then
-            echo "Output from mos-spectra not found for mos2S002. Aborting mos_back and script."
-            return 1 2> /dev/null || exit 1
-        fi  
+        cp "$region_files_list" ../spectral_products
 
-        mos_back prefix=2S002 caldb=$ESAS_CALDB diag=0 elow=300 ehigh=7000 ccd1=1 ccd2=1 ccd3=1 ccd4=1 ccd5=0 ccd6=1 ccd7=1
+        ls >> post_inventory.txt
 
-        wait $!
+        grep -Fxv -f pre_inventory.txt post_inventory.txt >> diff_inventory.txt
 
-        if [[ ! -f "mos2S002-back.pi" ]]; then
-            echo "Output from mos_back not found for mos2S002. Aborting file renaming and grppha."
-            return 1 2> /dev/null || exit 1
-        fi
+        while read -r line
+        do
+            echo "$line"
+            rm "$line"
+        done < "diff_inventory.txt"
 
-        mv mos2S002-obj.pi "mos2S002-obj-$line.pi"
-        mv mos2S002-back.pi "mos2S002-back-$line.pi"
-        mv mos2S002.rmf "mos2S002-$line.rmf"
-        mv mos2S002.arf "mos2S002-$line.arf"
-        mv mos2S002-obj-im-sp-det.fits "mos2S002-sp-$line.fits"
+        rm diff_inventory.txt
 
-        . groupy.sh mos2S002 "-$line"
-
-        mv *-$line* ../spectral_products
-    fi
-
-    # pn
-    if [[ "$detector" == "pn" || "$detector" == "all" ]]; then
-
-        if [[ -f "pnS003-obj.pi" ]]; then
-
-            echo "Found pnS003-obj.pi"
-            echo "Skipping run of pn-spectra as it won't overwrite."
-            echo "Either clear all pn-spectra output or start over."
-
-        elif [[ -f "pnS003-obj-$line.pi" ]]; then
-
-            echo "Found pnS003-obj-$line.pi. This will be overwritten if script continues."
-            echo -n "Continue and overwrite pnS003-obj-$line.pi?"
-            read -p "" answer
-
-            if [ "$answer" != "${answer#[Yy]}" ] ;then # this grammar (the #[] operator) means that the variable $answer where any Y or y in 1st position will be dropped if they exist.
-                echo Yes
-                pn-spectra prefix=S003 caldb=$ESAS_CALDB region="pnS003_$line.txt" mask=0 elow=300 ehigh=7000 quad1=1 quad2=1 quad3=1 quad4=1
-            else
-                echo No
-                return 1 2> /dev/null || exit 1
-            fi
-
-        else
-            pn-spectra prefix=S003 caldb=$ESAS_CALDB region="pnS003_$line.txt" mask=0 elow=300 ehigh=7000 quad1=1 quad2=1 quad3=1 quad4=1
-        fi
-
-        wait $!
-
-        if [[ ! -f "pnS003-obj.pi" ]]; then
-            echo "Output from pn-spectra not found. Aborting mos_back and script."
-            return 1 2> /dev/null || exit 1
-        fi  
-
-        pn_back prefix=S003 caldb=$ESAS_CALDB diag=0 elow=300 ehigh=7000 quad1=1 quad2=1 quad3=1 quad4=1
-
-        wait $!
-
-        if [[ ! -f "pnS003-back.pi" ]]; then
-            echo "Output from pn_back not found. Aborting file renaming and grppha."
-            return 1 2> /dev/null || exit 1
-        fi
-
-        mv pnS003-obj.pi "pnS003-obj-$line.pi"
-        mv pnS003-back.pi "pnS003-back-$line.pi"
-        mv pnS003.rmf "pnS003-$line.rmf"
-        mv pnS003.arf "pnS003-$line.arf"
-        mv pnS003-obj-im-sp-det.fits "pnS003-sp-$line.fits"
-        mv pnS003-obj-os.pi "pnS003-obj-os-$line.pi"
-
-        . groupy.sh pnS003 "-$line"
-
-        mv *-$line* ../spectral_products
-    fi
-    
+    done
     # SAS_CLOBBER=0
     # SAS_VERB=0
 
     echo
     #echo "$line$found"
 done 3< "$region_files_list"
-
 
 # https://stackoverflow.com/questions/11704353/bash-nested-interactive-read-within-a-loop-thats-also-using-read
