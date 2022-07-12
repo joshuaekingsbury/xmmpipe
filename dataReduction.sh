@@ -8,6 +8,10 @@ detector=${1:-"all"}
 region_files_list=${2:-"reg_files.txt"}
 ## Check if input file exists
 
+####
+elo=300
+ehi=7000
+
 if [[ ! -f $region_files_list ]]; then
     echo "Text file containing region file names not found."
     echo "Either create file reg_files.txt and populate with [region_file].reg;"
@@ -22,8 +26,10 @@ fi
 if [[ ! -d intermediates ]]; then
     mkdir intermediates
 fi
+if [[ ! -d logs ]]; then
+    mkdir logs
+fi
 popd
-
 
 ##
 ##
@@ -80,14 +86,8 @@ done
 
 # List detectors and exposures found
 echo
-echo "Detectors and Exposures Selected for Detector <$detector>:"
+echo "Detectors and Exposures Selected for Detector <$detector>."
 echo
-
-for f in ${exp_select[@]}; do
-
-    echo "$f"
-
-done
 
 echo
 echo -n "Continue with the selected detector(s) and exposure(s)?"
@@ -143,9 +143,9 @@ do
 
             if [[ $spectra_continue == true ]]; then
                 if [[ "${e:3:1}" == 1 ]]; then
-                    mos-spectra prefix=$exposure caldb=$ESAS_CALDB region="$e_$line.txt" mask=0 elow=300 ehigh=7000 ccd1=1 ccd2=1 ccd3=1 ccd4=1 ccd5=1 ccd6=1 ccd7=1
+                    mos-spectra prefix=$exposure caldb=$ESAS_CALDB region="$e_$line.txt" mask=0 elow=$elo ehigh=$ehi ccd1=1 ccd2=1 ccd3=1 ccd4=1 ccd5=1 ccd6=1 ccd7=1 | tee ./_log_mos1-spectra-$line.txt
                 elif [[ "${e:3:1}" == 2 ]]; then
-                    mos-spectra prefix=$exposure caldb=$ESAS_CALDB region="$e_$line.txt" mask=0 elow=300 ehigh=7000 ccd1=1 ccd2=1 ccd3=1 ccd4=1 ccd5=1 ccd6=1 ccd7=1
+                    mos-spectra prefix=$exposure caldb=$ESAS_CALDB region="$e_$line.txt" mask=0 elow=$elo ehigh=$ehi ccd1=1 ccd2=1 ccd3=1 ccd4=1 ccd5=1 ccd6=1 ccd7=1 | tee ./_log_mos2-spectra-$line.txt
                 fi
             fi
 
@@ -157,9 +157,9 @@ do
             fi    
 
             if [[ "${e:3:1}" == 1 ]]; then
-                mos_back prefix=$exposure caldb=$ESAS_CALDB diag=0 elow=300 ehigh=7000 ccd1=1 ccd2=1 ccd3=1 ccd4=1 ccd5=1 ccd6=1 ccd7=1
+                mos_back prefix=$exposure caldb=$ESAS_CALDB diag=0 elow=$elo ehigh=$ehi ccd1=1 ccd2=1 ccd3=1 ccd4=1 ccd5=1 ccd6=1 ccd7=1 | tee ./_log_mos1_back-$line.txt
             elif [[ "${e:3:1}" == 2 ]]; then
-                mos_back prefix=$exposure caldb=$ESAS_CALDB diag=0 elow=300 ehigh=7000 ccd1=1 ccd2=1 ccd3=1 ccd4=1 ccd5=1 ccd6=1 ccd7=1
+                mos_back prefix=$exposure caldb=$ESAS_CALDB diag=0 elow=$elo ehigh=$ehi ccd1=1 ccd2=1 ccd3=1 ccd4=1 ccd5=1 ccd6=1 ccd7=1 | tee ./_log_mos2_back.txt
             fi
 
 
@@ -179,62 +179,6 @@ do
             mv *-$line* ../spectral_products
 
         fi
-
-        # # MOS2
-        # if [[ "${f%%"S"*}" == "mos2" ]]; then
-        #     # Since we know detector is mosX; get XXX-spectra prefix by creating substring
-        #     exposure="${e:3}"
-
-        #     if [[ -f "mos2S002-obj.pi" ]]; then
-
-        #         echo "Found mos2S002-obj.pi"
-        #         echo "Skipping run of mos-spectra as it won't overwrite."
-        #         echo "Either clear all mos-spectra output or start over."
-
-        #     elif [[ -f "mos2S002-obj-$line.pi" ]]; then
-
-        #         echo "Found mos2S002-obj-$line.pi. This will be overwritten if script continues."
-        #         echo -n "Continue and overwrite mos2S002-obj-$line.pi?"
-        #         read -p "" answer
-
-        #         if [ "$answer" != "${answer#[Yy]}" ] ;then # this grammar (the #[] operator) means that the variable $answer where any Y or y in 1st position will be dropped if they exist.
-        #             echo Yes
-        #             mos-spectra prefix=2S002 caldb=$ESAS_CALDB region="mos2S002_$line.txt" mask=0 elow=300 ehigh=7000 ccd1=1 ccd2=1 ccd3=1 ccd4=1 ccd5=0 ccd6=1 ccd7=1
-        #         else
-        #             echo No
-        #             return 1 2> /dev/null || exit 1
-        #         fi
-
-        #     else
-        #         mos-spectra prefix=2S002 caldb=$ESAS_CALDB region="mos2S002_$line.txt" mask=0 elow=300 ehigh=7000 ccd1=1 ccd2=1 ccd3=1 ccd4=1 ccd5=0 ccd6=1 ccd7=1
-        #     fi
-
-        #     wait $!
-
-        #     if [[ ! -f "mos2S002-obj.pi" ]]; then
-        #         echo "Output from mos-spectra not found for mos2S002. Aborting mos_back and script."
-        #         return 1 2> /dev/null || exit 1
-        #     fi  
-
-        #     mos_back prefix=2S002 caldb=$ESAS_CALDB diag=0 elow=300 ehigh=7000 ccd1=1 ccd2=1 ccd3=1 ccd4=1 ccd5=0 ccd6=1 ccd7=1
-
-        #     wait $!
-
-        #     if [[ ! -f "mos2S002-back.pi" ]]; then
-        #         echo "Output from mos_back not found for mos2S002. Aborting file renaming and grppha."
-        #         return 1 2> /dev/null || exit 1
-        #     fi
-
-        #     mv mos2S002-obj.pi "mos2S002-obj-$line.pi"
-        #     mv mos2S002-back.pi "mos2S002-back-$line.pi"
-        #     mv mos2S002.rmf "mos2S002-$line.rmf"
-        #     mv mos2S002.arf "mos2S002-$line.arf"
-        #     mv mos2S002-obj-im-sp-det.fits "mos2S002-sp-$line.fits"
-
-        #     . groupy.sh mos2S002 "-$line"
-
-        #     mv *-$line* ../spectral_products
-        # fi
 
         # pn
         if [[ "${e%%"S"*}" == "pn" ]]; then
@@ -266,7 +210,7 @@ do
             fi
 
             if [[ $spectra_continue == true ]]; then
-                pn-spectra prefix=$exposure caldb=$ESAS_CALDB region="$e_$line.txt" mask=0 elow=300 ehigh=7000 quad1=1 quad2=1 quad3=1 quad4=1
+                pn-spectra prefix=$exposure caldb=$ESAS_CALDB region="$e_$line.txt" mask=0 elow=$elo ehigh=7000 quad1=1 quad2=1 quad3=1 quad4=1 | tee ./_log_pn-spectra-$line.txt
             fi
 
             wait $!
@@ -276,7 +220,7 @@ do
                 return 1 2> /dev/null || exit 1
             fi  
 
-            pn_back prefix=$exposure caldb=$ESAS_CALDB diag=0 elow=300 ehigh=7000 quad1=1 quad2=1 quad3=1 quad4=1
+            pn_back prefix=$exposure caldb=$ESAS_CALDB diag=0 elow=$elo ehigh=$ehi quad1=1 quad2=1 quad3=1 quad4=1 | tee ./_log_pn_back-$line.txt
 
             wait $!
 
@@ -294,39 +238,81 @@ do
 
             . groupy.sh $e "-$line"
 
-            mv *-$line* ../spectral_products
+            ## Need to expand
+            mv *-$line.* ../spectral_products
         fi
 
-        cp *-mask-im.fits ../intermediates
-        cp *-mask-im-*0.fits ../intermediates
-        cp *-obj-im.fits ../intermediates
-        cp *-obj-im-*0.fits ../intermediates
-        cp *.txt ../intermediates
-        cp *.reg ../intermediates
+
+        ####
+        ##  Copy intermediate files and move spectra-related products
+        ####
+
+        if [[ -f $e-obj-image-sky.fits && ! -f ../intermediates/$e-obj-image-sky.fits ]]; then
+            cp $e-obj-image-sky.fits ../intermediates
+            ## DS9 export images
+            ds9 "./$e-obj-image-sky.fits" -scale log -cmap heat -zoom to fit -saveimage png "../intermediates/$e-obj-image-sky.png" -exit &
+            wait $!
+            ##
+        elif [[ ! -f $e-obj-image-sky.fits ]]; then
+            echo "$e-obj-image-sky.fits not found in analysis dir; not copied to intermediates"
+        fi
+
+        if [[ -f $e-clean.fits && ! -f ../intermediates/$e-clean.fits ]]; then
+            cp $e-clean.fits ../intermediates
+            ## DS9 export images
+            ds9 "./$e-clean.fits" -scale log -cmap heat -zoom to fit -saveimage png "../intermediates/$e-clean.fits.png" -exit &
+            wait $!
+            ##
+        elif [[ ! -f $e-clean.fits ]]; then
+            echo "$e-clean.fits not found in analysis dir; not copied to intermediates"
+        fi
+
+        cp $e-obj-im-$elo-$ehi.fits ../intermediates/$e-obj-im-$elo-$ehi-$line.fits
+        ## DS9 export images
+        ds9 "./$e-obj-im-$elo-$ehi.fits" -scale log -cmap heat -zoom to fit -saveimage png "../intermediates/$e-obj-im-det-$elo-$ehi-$line.png" -exit &
+        wait $!
+        ##
+
+        cp $e-obj-im-det-$elo-$ehi.fits ../intermediates/$e-obj-im-det-$elo-$ehi-$line.fits
+        ## DS9 export images
+        ds9 "./$e-obj-im-det-$elo-$ehi.fits" -scale log -cmap heat -zoom to fit -saveimage png "../intermediates/$e-obj-im-det-$elo-$ehi-$line.png" -exit &
+        wait $!
+        ##
+
         cp *.jpeg ../intermediates
         cp *.png ../intermediates
         cp *.jpg ../intermediates
 
+        cp *.txt ../intermediates
+        cp *.reg ../intermediates
+
         cp "$region_files_list" ../spectral_products
+
+        ####
+
+        ####
+        ##  Clean up directory by deleting any files made since the script began running
+        ####
 
         ls >> post_inventory.txt
 
         grep -Fxv -f pre_inventory.txt post_inventory.txt >> diff_inventory.txt
 
-        while read -r line
+        while read -r file_to_remove
         do
-            echo "$line"
-            rm "$line"
+            echo "$file_to_remove"
+            rm "$file_to_remove"
         done < "diff_inventory.txt"
 
         rm diff_inventory.txt
 
-    done
-    # SAS_CLOBBER=0
-    # SAS_VERB=0
+        ####
 
-    echo
-    #echo "$line$found"
+    done
+
+
 done 3< "$region_files_list"
+
+
 
 # https://stackoverflow.com/questions/11704353/bash-nested-interactive-read-within-a-loop-thats-also-using-read
