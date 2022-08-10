@@ -12,12 +12,24 @@ region_files_list=${2:-"reg_files.txt"}
 elo=300
 ehi=7000
 
+
+_CURRENT_DIR=${PWD##*/}
+
+if [ $_CURRENT_DIR != "analysis" ]; then
+    echo
+    echo "Current directory is not 'analysis'. Try again. ;)"
+    echo
+    return 1 2> /dev/null || exit 1
+fi
+
 if [[ ! -f $region_files_list ]]; then
     echo "Text file containing region file names not found."
     echo "Either create file reg_files.txt and populate with [region_file].reg;"
     echo "or check that $region_files_list exists."
     return 1 2> /dev/null || exit 1
 fi
+
+
 
 pushd ..
 if [[ ! -d spectral_products ]]; then
@@ -26,9 +38,9 @@ fi
 if [[ ! -d intermediates ]]; then
     mkdir intermediates
 fi
-if [[ ! -d logs ]]; then
-    mkdir logs
-fi
+# if [[ ! -d logs ]]; then
+#     mkdir logs
+# fi
 popd
 
 ##
@@ -110,12 +122,22 @@ ls >> pre_inventory.txt
 while read -r -u 3 line
 do
     for e in ${exp_select[@]}; do
+        sched_flag=${e: -4:1} # S for Scheduled, U for Unscheduled, X for multi-exposure?
         exposure=""
         spectra_continue=false
+
+        # echo
+        # echo "sched $sched_flag"
+        # echo "det ${e%%$sched_flag*}"
+        # echo 
+
+        detector=${e%%$sched_flag*}
+
         # MOS1
-        if [[ "${e%%"S"*}" == "mos1" ]]; then
+        if [[ "$detector" == "mos1" || "$detector" == "mos2" ]]; then
             # Since we know detector is mosX; get XXX-spectra prefix by creating substring
-            exposure="${e:3}"
+            #exposure="${e:3}"
+            exposure="${e#*$detector}"
 
             if [[ -f "$e-obj.pi" ]]; then
 
@@ -143,9 +165,9 @@ do
 
             if [[ $spectra_continue == true ]]; then
                 if [[ "${e:3:1}" == 1 ]]; then
-                    mos-spectra prefix=$exposure caldb=$ESAS_CALDB region="$e_$line.txt" mask=0 elow=$elo ehigh=$ehi ccd1=1 ccd2=1 ccd3=1 ccd4=1 ccd5=1 ccd6=1 ccd7=1 | tee ./_log_mos1-spectra-$line.txt
+                    mos-spectra prefix=$exposure caldb=$ESAS_CALDB region="${e}_${line}.txt" mask=0 elow=$elo ehigh=$ehi ccd1=1 ccd2=1 ccd3=1 ccd4=1 ccd5=1 ccd6=1 ccd7=1 | tee ./_log_mos1-spectra_$line.txt
                 elif [[ "${e:3:1}" == 2 ]]; then
-                    mos-spectra prefix=$exposure caldb=$ESAS_CALDB region="$e_$line.txt" mask=0 elow=$elo ehigh=$ehi ccd1=1 ccd2=1 ccd3=1 ccd4=1 ccd5=1 ccd6=1 ccd7=1 | tee ./_log_mos2-spectra-$line.txt
+                    mos-spectra prefix=$exposure caldb=$ESAS_CALDB region="${e}_${line}.txt" mask=0 elow=$elo ehigh=$ehi ccd1=1 ccd2=1 ccd3=1 ccd4=1 ccd5=1 ccd6=1 ccd7=1 | tee ./_log_mos2-spectra_$line.txt
                 fi
             fi
 
@@ -157,9 +179,9 @@ do
             fi    
 
             if [[ "${e:3:1}" == 1 ]]; then
-                mos_back prefix=$exposure caldb=$ESAS_CALDB diag=0 elow=$elo ehigh=$ehi ccd1=1 ccd2=1 ccd3=1 ccd4=1 ccd5=1 ccd6=1 ccd7=1 | tee ./_log_mos1_back-$line.txt
+                mos_back prefix=$exposure caldb=$ESAS_CALDB diag=0 elow=$elo ehigh=$ehi ccd1=1 ccd2=1 ccd3=1 ccd4=1 ccd5=1 ccd6=1 ccd7=1 | tee ./_log_mos1_back_$line.txt
             elif [[ "${e:3:1}" == 2 ]]; then
-                mos_back prefix=$exposure caldb=$ESAS_CALDB diag=0 elow=$elo ehigh=$ehi ccd1=1 ccd2=1 ccd3=1 ccd4=1 ccd5=1 ccd6=1 ccd7=1 | tee ./_log_mos2_back.txt
+                mos_back prefix=$exposure caldb=$ESAS_CALDB diag=0 elow=$elo ehigh=$ehi ccd1=1 ccd2=1 ccd3=1 ccd4=1 ccd5=1 ccd6=1 ccd7=1 | tee ./_log_mos2_back_$line.txt
             fi
 
 
@@ -176,14 +198,18 @@ do
 
             . groupy.sh $e "-$line"
 
-            mv *-$line* ../spectral_products
+            ## This far only products, regions, and logs have been saved with $line specifier
+            ## Ignore txt since they will be moved at end and not overwritten; region files are _$line and so are skipped here too
+            #mv *-$line.* ../spectral_products
+            find . -maxdepth 1 -type f -iname "*-$line.*" ! -iname "" | xargs -I '{}' mv {} ../spectral_products
 
         fi
 
         # pn
-        if [[ "${e%%"S"*}" == "pn" ]]; then
+        if [[ "$detector" == "pn" ]]; then
             # Since we know detector is pn; get XXX-spectra prefix by creating substring
-            exposure="${e:2}"
+            #exposure="${e:2}"
+            exposure="${e#*$detector}"
 
             if [[ -f "$e-obj.pi" ]]; then
 
@@ -210,7 +236,7 @@ do
             fi
 
             if [[ $spectra_continue == true ]]; then
-                pn-spectra prefix=$exposure caldb=$ESAS_CALDB region="$e_$line.txt" mask=0 elow=$elo ehigh=7000 quad1=1 quad2=1 quad3=1 quad4=1 | tee ./_log_pn-spectra-$line.txt
+                pn-spectra prefix=$exposure caldb=$ESAS_CALDB region="${e}_${line}.txt" mask=0 elow=$elo ehigh=7000 quad1=1 quad2=1 quad3=1 quad4=1 | tee ./_log_pn-spectra_$line.txt
             fi
 
             wait $!
@@ -220,7 +246,7 @@ do
                 return 1 2> /dev/null || exit 1
             fi  
 
-            pn_back prefix=$exposure caldb=$ESAS_CALDB diag=0 elow=$elo ehigh=$ehi quad1=1 quad2=1 quad3=1 quad4=1 | tee ./_log_pn_back-$line.txt
+            pn_back prefix=$exposure caldb=$ESAS_CALDB diag=0 elow=$elo ehigh=$ehi quad1=1 quad2=1 quad3=1 quad4=1 | tee ./_log_pn_back_$line.txt
 
             wait $!
 
@@ -238,8 +264,10 @@ do
 
             . groupy.sh $e "-$line"
 
-            ## Need to expand
-            mv *-$line.* ../spectral_products
+            ## This far only products, regions, and logs have been saved with $line specifier
+            ## Ignore txt since they will be moved at end and not overwritten; region files are _$line and so are skipped here too
+            #mv *-$line.* ../spectral_products
+            find . -maxdepth 1 -type f -iname "*-$line.*" ! -iname "" | xargs -I '{}' mv {} ../spectral_products
         fi
 
 
@@ -257,14 +285,34 @@ do
             echo "$e-obj-image-sky.fits not found in analysis dir; not copied to intermediates"
         fi
 
+        if [[ -f $e-obj-image-det.fits && ! -f ../intermediates/$e-obj-image-det.fits ]]; then
+            cp $e-obj-image-det.fits ../intermediates
+            ## DS9 export images
+            ds9 "./$e-obj-image-det.fits" -scale log -cmap heat -zoom to fit -saveimage png "../intermediates/$e-obj-image-det.png" -exit &
+            wait $!
+            ##
+        elif [[ ! -f $e-obj-image-det.fits ]]; then
+            echo "$e-obj-image-det.fits not found in analysis dir; not copied to intermediates"
+        fi
+
         if [[ -f $e-clean.fits && ! -f ../intermediates/$e-clean.fits ]]; then
             cp $e-clean.fits ../intermediates
             ## DS9 export images
-            ds9 "./$e-clean.fits" -scale log -cmap heat -zoom to fit -saveimage png "../intermediates/$e-clean.fits.png" -exit &
+            ds9 "./$e-clean.fits" -scale log -cmap heat -bin to fit -zoom to fit -saveimage png "../intermediates/$e-clean.fits.png" -exit &
             wait $!
             ##
         elif [[ ! -f $e-clean.fits ]]; then
             echo "$e-clean.fits not found in analysis dir; not copied to intermediates"
+        fi
+
+        if [[ -f $e-mask-im-det-$elo-$ehi.fits && ! -f ../intermediates/$e-mask-im-det-$elo-$ehi.fits ]]; then
+            cp $e-mask-im-det-$elo-$ehi.fits ../intermediates/$e-mask-im-det-$elo-$ehi.fits
+            ## DS9 export images
+            ds9 "./$e-mask-im-det-$elo-$ehi.fits" -scale log -cmap heat -zoom to fit -saveimage png "../intermediates/$e-mask-im-det-$elo-$ehi.png" -exit &
+            wait $!
+            ##
+        elif [[ ! -f $e-clean.fits ]]; then
+            echo "$e-mask-im-det-$elo-$ehi.fits not found in analysis dir; not copied to intermediates"
         fi
 
         cp $e-obj-im-$elo-$ehi.fits ../intermediates/$e-obj-im-$elo-$ehi-$line.fits
