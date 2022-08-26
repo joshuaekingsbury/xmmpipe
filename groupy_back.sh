@@ -88,6 +88,7 @@ do
         if [[ -f $src && -f $bg ]]; then
             regPix=$(getpix -g 0 $src 0 0 | wc -l)
             backPix=$(getpix -g 0 $bg 0 0 | wc -l)
+            obs=$(gethead OBS_ID "$src")
             popd
         else
             echo "Source or background detector image not found in ../intermediates"
@@ -108,7 +109,7 @@ do
         ratio=$(echo "scale=10; $regPix/$backPix" | bc -q)
         echo "echoing backscal $ratio"
 
-        . groupy.sh "$detector" "-$line" 25 "-$bgregion_suffix" "$ratio"
+        . groupy.sh "${obs}" "-$line" 25 "-$bgregion_suffix" "$ratio"
     fi
 
 done < "$region_files_list"
