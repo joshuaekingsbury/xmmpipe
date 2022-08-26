@@ -1,4 +1,10 @@
 
+# After regular group.sh has run during normal processing, can run this to clean up and create background subtracted files
+# Is a temp fix since all data has already been reduced
+# Next is to update groupy.sh and groupy_back.sh to rename files this way directly after processing
+# . id_products.sh <observation id> <detectorExposure> <energy low ev> <energy high ev>
+# . id_products.sh 0657802301 pnS003 300 7000
+
 obs=$1
 det=$2
 elo=$3
