@@ -17,13 +17,14 @@ if [[ "${line:0:1}" == "p" ]]; then
 else
     inFile=${inst}"-obj$suffix.pi"
 fi
-outFile=${inst}"-obj-grp$suffix.pi"
+outFile="grp-"${inst}"$suffix.pi"
 arfFile=${inst}"$suffix.arf"
 rmfFile=${inst}"$suffix.rmf"
 
+## If telling what the background file suffix is, then must be wanting to bg subtract
 if [[ "$bgsuffix" != "" ]]; then
-    nxbFile=${inst}"-obj-grp$bgsuffix.pi"
-    outFile=${inst}"-obj-grp$suffix-bgsubd.pi"
+    nxbFile="grp-"${inst}"$bgsuffix.pi"
+    outFile="backed-"${inst}"$suffix.pi"
 else
     nxbFile=${inst}"-back$suffix.pi"
 fi
