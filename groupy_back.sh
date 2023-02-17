@@ -9,7 +9,7 @@ elo=$2
 
 ehi=$3
 
-bgregion_suffix=${4:-"back"}
+bgregion_suffix=${4:-"tsuru_back"}
 
 region_files_list=${5:-"reg_files.txt"}
 
