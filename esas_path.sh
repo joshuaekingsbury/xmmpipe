@@ -82,6 +82,7 @@ if [ "$answer" != "${answer#[Yy]}" ] ;then # this grammar (the #[] operator) mea
         expid=$(gethead EXPIDSTR "$f")
 
         ds9 "./$f" -scale log -cmap sls -zoom to fit -saveimage png "./$instrume$expid-det-soft.png" -exit &
+        #ds9 "${_CURRENT_DIR}/$f" -scale log -cmap sls -zoom to fit -saveimage png "${_CURRENT_DIR}/$instrume$expid-det-soft.png" -exit &
         wait $!
         echo "Saved image as: $instrume$expid"
     done
