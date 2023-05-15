@@ -46,10 +46,10 @@ if [ $_CURRENT_DIR == "analysis" ]; then
     #     cheese prefixm=$det scale=0.20 rate=0.01 rates=0.01 rateh=0.01 dist=15.0 clobber=1 elow=300 ehigh=7000
     # fi
 
-    _SCALE=0.2
-    _RATE=0.01
+    _SCALE=0.5
+    _RATE=0.1
 
-    cheese prefixm="1S001 2S002" prefixp="S003" scale=$_SCALE rate=$_RATE rates=1.0 rateh=0.01 dist=15.0 clobber=1 elow=300 ehigh=7000
+    cheese prefixm="1S001 2S003" prefixp="S002" scale=$_SCALE rate=$_RATE rates=1.0 rateh=0.1 dist=15.0 clobber=1 elow=300 ehigh=7000
 
     # cheese-band prefixm="1S001 2S002" prefixp="S003" scale=0.20 ratet=0.01 rates=0.01 rateh=0.01 dist=15.0 clobber=1 elow=300 ehigh=7000
 
