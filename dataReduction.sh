@@ -236,7 +236,9 @@ do
             fi
 
             if [[ $spectra_continue == true ]]; then
-                pn-spectra prefix=$exposure caldb=$ESAS_CALDB region="${e}_${line}.txt" mask=0 elow=$elo ehigh=7000 quad1=1 quad2=1 quad3=1 quad4=1 | tee ./_log_pn-spectra_$line.txt
+                #pn-spectra prefix=$exposure caldb=$ESAS_CALDB region="${e}_${line}.txt" mask=0 elow=$elo ehigh=7000 quad1=1 quad2=1 quad3=1 quad4=1 | tee ./_log_pn-spectra_$line.txt
+                pn-spectra prefix=$exposure caldb=$ESAS_CALDB region="${e}_${line}.txt" pattern=0 mask=1 withsrcrem=1 withimages=yes maskdet="pnS002-bkg_region-det.fits" elow=$elo ehigh=7000 quad1=1 quad2=1 quad3=1 quad4=1 | tee ./_log_pn-spectra_$line.txt
+
             fi
 
             wait $!
