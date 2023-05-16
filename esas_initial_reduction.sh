@@ -316,6 +316,9 @@ else
     return 1 2> /dev/null || exit 1
 fi
 
+allevc_csv=()
+gti_csv=()
+
 diagn_suffix="-diagn-det-unfilt"
 
 for E in ${exposures[@]}; do
@@ -470,7 +473,12 @@ for E in ${exposures[@]}; do
         withsmoothing=yes smooth=51 rangescale=15.0 allowsigma=3.0 method=histogram \
         withoot=Y ootfile=${in_file_oot} keepinterfiles=false
 
+        allevc_csv+=("${detector},${EXPOSURE},${detector}${EXPOSURE}-allevcoot.fits")
+
     fi
+
+    allevc_csv+=("${detector},${EXPOSURE},${detector}${EXPOSURE}-allevc.fits")
+    gti_csv+=("${detector},${EXPOSURE},${detector}${EXPOSURE}-gti.fits")
 
     ## DS9 export images
     ds9 "${PWD}/${detector}${EXPOSURE}-allimc.fits" -scale log -cmap heat -zoom to fit -saveimage png "${PWD}/${detector}${EXPOSURE}-diagn-allimc.png" -exit &
@@ -531,3 +539,7 @@ for i in "${qdp_espfilt_out[@]}"
 do
     mv "${i}" intermediates/espfilt
 done
+
+
+printf "%s\n" "${allevc_csv[@]}" > meta/allevc_csv.txt
+printf "%s\n" "${gti_csv[@]}" > meta/gti_csv.txt

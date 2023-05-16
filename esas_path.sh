@@ -82,6 +82,9 @@ fi
 if [[ ! -d diagnostics ]]; then
     mkdir diagnostics
 fi
+if [[ ! -d meta ]]; then
+    mkdir meta
+fi
 #popd
 
 echo
