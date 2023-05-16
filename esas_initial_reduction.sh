@@ -122,6 +122,7 @@ fi
 
 # epchain package documentation recommends the following parameters and epchain order,
 # then also states order of epchain calls is irrelevant
+# Raw files *are* cleaned up by second epchain; maybe they're also reused to save time (look into at some point)
 if $run_epchain ;then
 
     echo
@@ -517,7 +518,7 @@ done
 
 # Sort espfilt outputs
 espfilt_out=($( find . -maxdepth 1 -type f -name '*.fits' ))
-qdp_espfilt_out=($( find . -maxdepth 1 -type f -name '*-hist.dqp' ))
+qdp_espfilt_out=($( find . -maxdepth 1 -type f -name '*-hist.qdp' ))
 primary_espfilt_out=($( find . -maxdepth 1 -type f -name '*.fits' ! -name '*-allevc*.fits' ! -name '*-gti.fits' ))
 
 ## Copy, then move so I don't need mess with rm and primary files are retained in working dir
