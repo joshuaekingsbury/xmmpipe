@@ -73,8 +73,8 @@ fi
 if [[ ! -d intermediates ]]; then
     mkdir intermediates
     mkdir intermediates/chain
+    mkdir intermediates/espfilt
     mkdir intermediates/filter
-    mkdir intermediates/anomalous
 fi
 if [[ ! -d logs ]]; then
     mkdir logs
