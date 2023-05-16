@@ -186,7 +186,7 @@ event_chain_out=($( find . -maxdepth 1 -type f -name '*EVLI*.FIT' ))
 if [[ -n "${event_chain_out[@]}" ]]; then
     echo
     echo "e%chain outputs found"
-    printf "'%s'\n" "${event_chain_out[@]}"
+    printf "%s\n" "${event_chain_out[@]}"
     echo
 else
     echo
