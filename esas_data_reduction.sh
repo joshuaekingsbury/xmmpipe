@@ -31,17 +31,17 @@ fi
 
 
 
-pushd ..
-if [[ ! -d spectral_products ]]; then
-    mkdir spectral_products
-fi
-if [[ ! -d intermediates ]]; then
-    mkdir intermediates
-fi
-# if [[ ! -d logs ]]; then
-#     mkdir logs
+# pushd ..
+# if [[ ! -d spectral_products ]]; then
+#     mkdir spectral_products
 # fi
-popd
+# if [[ ! -d intermediates ]]; then
+#     mkdir intermediates
+# fi
+# # if [[ ! -d logs ]]; then
+# #     mkdir logs
+# # fi
+# popd
 
 ##
 ##
