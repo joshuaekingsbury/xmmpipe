@@ -128,14 +128,14 @@ if $run_epchain ;then
     echo "Running chains for PN detector"
     echo
 
-    #epchain withoutoftime=Y keepintermediate=raw | tee ./_log_epchain_oot.txt
+    epchain withoutoftime=Y keepintermediate=raw | tee ./_log_epchain_oot.txt
 
     # Check for output *PN*OOEVLI*.FIT
     if [ ! -f *PN*OOEVLI*.FIT ] ;then
         echo "*** No Out-of-Time output from epchain"
     fi
 
-    #epchain | tee ./_log_epchain.txt
+    epchain | tee ./_log_epchain.txt
 
     # Check for output *PN*PIEVLI*.FIT
     if [ ! -f *PN*PIEVLI*.FIT ] ;then
@@ -155,7 +155,7 @@ if $run_emchain_mos1 ;then
     echo "Running chain for MOS1 detector"
     echo
 
-    #emchain instruments=M1 | tee ./_log_emchain_mos1.txt
+    emchain instruments=M1 | tee ./_log_emchain_mos1.txt
 
     # Check for output *M1*MIEVLI*.FIT
     if [ ! -f *M1*MIEVLI*.FIT ] ;then
@@ -170,7 +170,7 @@ if $run_emchain_mos2 ;then
     echo "Running chain for MOS2 detector"
     echo
 
-    #emchain instruments=M2 | tee ./_log_emchain_mos2.txt
+    emchain instruments=M2 | tee ./_log_emchain_mos2.txt
 
     # Check for output *M2*MIEVLI*.FIT
     if [ ! -f *M2*MIEVLI*.FIT ] ;then
