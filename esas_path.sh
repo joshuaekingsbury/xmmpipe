@@ -1,108 +1,170 @@
 #!/bin/bash
 
 # Make sure to *source* and not just run script
-# $. sassyPath.sh
+# $. script.sh
 # NOT
-# $sassyPath.sh
+# $script.sh
 
 _CURRENT_DIR=${PWD##*/}
 
-if [ $_CURRENT_DIR == "analysis" ]; then
+# Prompt user to check if current directory is acceptable to continue;
+# default is cookbook suggested "analysis" directory
+if [ $_CURRENT_DIR != "analysis" ]; then
 
-    #_OBD_ID=${PWD%/*}
-    #_OBS_ID=${_PARENT_DIR:1}
+    echo -n "Current directory is not 'analysis'. Continue anyway (y/n)?"
+    read response
 
-    export SAS_CCF="${PWD}/ccf.cif"
-
-    pushd ..
-    _OBD_ID=${PWD##*/}
-
-    if [ -d "./odf" ]; then
-        pushd ./odf
-        export SAS_ODF="${PWD}/"
-        popd
+    if [ "$response" != "${response#[Yy]}" ] ;then
+        echo
+        echo "Continuing in current directory: ${_CURRENT_DIR}"
+        echo
+    else
+        echo
+        echo "Opted NOT to continue in current directory: ${_CURRENT_DIR}"
+        echo "Please create an \"analysis\" directory to work from"
+        echo "*** Exiting"
+        echo
+        return 1 2> /dev/null || exit 1
     fi
 
-    popd
-
-    echo
-    echo "EXPORTED DIRECTORIES:"
-    echo "SAS_ODF="$SAS_ODF
-    echo "SAS_CCF="$SAS_CCF
-
-else
-    echo
-    echo "Current directory is not 'analysis'. Try again. ;)"
-    echo
 fi
 
-echo -n "Run from cifbuild thru to mos-filter (y/n)? "
-read answer
+export SAS_CCF="${PWD}/ccf.cif"
 
-if [ "$answer" != "${answer#[Yy]}" ] ;then # this grammar (the #[] operator) means that the variable $answer where any Y or y in 1st position will be dropped if they exist.
-    echo Yes
+echo
+echo "Pushing to parent directory"
+pushd ..
+#***_OBD_ID=${PWD##*/}
 
-    cifbuild withccfpath=no analysisdate=now category=XMMCCF calindexset=$SAS_CCF fullpath=yes
-
-    wait $!
-
-    odfingest odfdir=$SAS_ODF outdir=$SAS_ODF
-
-    wait $!
-
-    epchain withoutoftime=true
-
-    wait $!
-
-    epchain
-
-    wait $!
-    echo "epchain returned?"
-    echo "pn-filter about to start?"
-
-    pn-filter
-
-    wait $!
-
-    emchain
-
-    wait $!
-
-    mos-filter | tee ./_log_mos-filter.txt
-
-    # Get list of files containing *-obj-image-det-soft.fits
-    # For each one get instrument name, exposure id; save out detector soft band image
-    shopt -s nullglob
-    mosFiles=( mos*-obj-image-det-soft.fits )
-    #echo ${mosFiles[@]}
-    for f in ${mosFiles[@]}; do
-        instrume=$(gethead INSTRUME "$f") # EMOS1, EMOS2, EPN
-        instrume="${instrume:1}" # MOS1, MOS2, PN
-        instrume=$(echo "$instrume" | tr '[:upper:]' '[:lower:]') # mos1, mos2, pn
-        expid=$(gethead EXPIDSTR "$f")
-
-        ds9 "./$f" -scale log -cmap sls -zoom to fit -saveimage png "./$instrume$expid-det-soft.png" -exit &
-        #ds9 "${_CURRENT_DIR}/$f" -scale log -cmap sls -zoom to fit -saveimage png "${_CURRENT_DIR}/$instrume$expid-det-soft.png" -exit &
-        wait $!
-        echo "Saved image as: $instrume$expid"
-    done
-    shopt -u nullglob
-
-    wait $!
-
-    rm -f *FIT # From XMM ESAS Cookbook
-
-    wait $!
-
-    ## Should log output from mos-filter regarding potentially anomolous ccds
-    pushd ..
-    zip -r filtered.zip analysis
+# Check for and retrieve odf directory; exit if not found in parent directory
+if [ -d "./odf" ]; then
+    echo
+    echo "Pushing to odf directory"
+    pushd ./odf
+    export SAS_ODF="${PWD}/"
+    echo
+    echo "Popping to parent directory"
     popd
-
 else
-    echo No
+    echo
+    echo "*** No odf directory found in parent of working directory"
+    echo "(where \"odf\" is expected to be lowercase)"
+    echo "Popping back to working directory"
+    popd
+    echo
+    echo "Exiting"
     return 1 2> /dev/null || exit 1
 fi
+
+echo
+echo "Popping to working directory"
+popd
+
+echo
+echo "EXPORTED DIRECTORIES:"
+echo "SAS_ODF=${SAS_ODF}"
+echo "SAS_CCF=${SAS_CCF}"
+echo
+
+#pushd ..
+if [[ ! -d spectral_products ]]; then
+    mkdir spectral_products
+fi
+if [[ ! -d intermediates ]]; then
+    mkdir intermediates
+    mkdir intermediates/chain
+    mkdir intermediates/filter
+    mkdir intermediates/anomalous
+fi
+if [[ ! -d logs ]]; then
+    mkdir logs
+fi
+if [[ ! -d diagnostics ]]; then
+    mkdir diagnostics
+fi
+#popd
+
+echo
+echo -n "Run from cifbuild and odfingest (y/n)?"
+read response
+
+# This grammar (the #[] operator) trims the first leading y or Y from the string
+# If a y or Y is removed from the start of the word, the compared arguments are different, and a "yes" intention is assumed
+# This means a "return" is considered a no for safety to avoid overwriting files accidentally
+if [ "${response}" != "${response#[Yy]}" ] ;then
+    echo
+    echo Creating cif file and 
+    echo
+    
+    # Overwrites current cif.cif file in directory
+    cifbuild withccfpath=no analysisdate=now category=XMMCCF calindexset="${SAS_CCF}" fullpath=yes | tee ./_log_cifbuild.txt
+    
+    # Remove *.SAS files included from original pipeline processing and rebuild them
+    rm "${SAS_ODF}"/*.SAS
+    odfingest odfdir="${SAS_ODF}" outdir="${SAS_ODF}" | tee ./_log_odfingest.txt
+
+    #***
+    # wait $!
+
+    # epchain withoutoftime=true
+
+    # wait $!
+
+    # epchain
+
+    # wait $!
+    # echo "epchain returned?"
+    # echo "pn-filter about to start?"
+
+    # pn-filter
+
+    # wait $!
+
+    # emchain
+
+    # wait $!
+
+    # mos-filter | tee ./_log_mos-filter.txt
+
+    # # Get list of files containing *-obj-image-det-soft.fits
+    # # For each one get instrument name, exposure id; save out detector soft band image
+    # shopt -s nullglob
+    # mosFiles=( mos*-obj-image-det-soft.fits )
+    # #echo ${mosFiles[@]}
+    # for f in ${mosFiles[@]}; do
+    #     instrume=$(gethead INSTRUME "$f") # EMOS1, EMOS2, EPN
+    #     instrume="${instrume:1}" # MOS1, MOS2, PN
+    #     instrume=$(echo "$instrume" | tr '[:upper:]' '[:lower:]') # mos1, mos2, pn
+    #     expid=$(gethead EXPIDSTR "$f")
+
+    #     ds9 "./$f" -scale log -cmap sls -zoom to fit -saveimage png "./$instrume$expid-det-soft.png" -exit &
+    #     #ds9 "${_CURRENT_DIR}/$f" -scale log -cmap sls -zoom to fit -saveimage png "${_CURRENT_DIR}/$instrume$expid-det-soft.png" -exit &
+    #     wait $!
+    #     echo "Saved image as: $instrume$expid"
+    # done
+    # shopt -u nullglob
+
+    # wait $!
+
+    # rm -f *FIT # From XMM ESAS Cookbook
+
+    # wait $!
+
+    # ## Should log output from mos-filter regarding potentially anomolous ccds
+    # pushd ..
+    # zip -r filtered.zip analysis
+    # popd
+    #***
+
+else
+    echo
+    echo "Opted not to run cifbuild and odfingest tasks"
+    echo "Exiting"
+    echo
+    return 1 2> /dev/null || exit 1
+fi
+
+#***
 
 # cheese prefixm=1S001 scale=0.20 mask=1 rate=0.01 rates=0.01 rateh=0.01 dist=15.0 clobber=1 elow=300 ehigh=7000
 
