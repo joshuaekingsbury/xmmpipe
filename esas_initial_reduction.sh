@@ -34,7 +34,7 @@ if [ $_CURRENT_DIR != "analysis" ]; then
         echo
     else
         echo
-        echo "*** Opted NOT to continue in current directory: ${_CURRENT_DIR}"
+        echo "*_* Opted NOT to continue in current directory: ${_CURRENT_DIR}"
         echo "Please create an \"analysis\" directory to work from"
         echo "Exiting"
         echo
@@ -107,14 +107,14 @@ elif [[ "${response}" == "mos2" ]] ;then
 
 elif [[ "${response}" == "skip" ]] ;then
     echo
-    echo "*** Skipping e%chains"
+    echo "*_* Skipping e%chains"
     echo
 else
 
     echo
     echo "Desired detectors not explicitly given"
     echo "(all lowercase expected)"
-    echo "*** Exiting without running chains"
+    echo "*_* Exiting without running chains"
     echo
     return 1 2> /dev/null || exit 1
 fi
@@ -122,25 +122,26 @@ fi
 
 # epchain package documentation recommends the following parameters and epchain order,
 # then also states order of epchain calls is irrelevant
-# Raw files *are* cleaned up by second epchain; maybe they're also reused to save time (look into at some point)
 if $run_epchain ;then
 
     echo
     echo "Running chains for PN detector"
     echo
 
-    epchain withoutoftime=Y keepintermediate=raw | tee ./_log_epchain_oot.txt
+    ## Raw files *were* cleaned up by second epchain in v20, not in v21; not keeping intermediates...
+    # epchain withoutoftime=Y keepintermediate=raw | tee ./_log_epchain_oot.txt
+    epchain withoutoftime=Y | tee ./_log_epchain_oot.txt
 
     # Check for output *PN*OOEVLI*.FIT
     if [ ! -f *PN*OOEVLI*.FIT ] ;then
-        echo "*** No Out-of-Time output from epchain"
+        echo "*_* No Out-of-Time output from epchain"
     fi
 
     epchain | tee ./_log_epchain.txt
 
     # Check for output *PN*PIEVLI*.FIT
     if [ ! -f *PN*PIEVLI*.FIT ] ;then
-        echo "*** No output from epchain"
+        echo "*_* No output from epchain"
     fi
 
 fi
@@ -160,7 +161,7 @@ if $run_emchain_mos1 ;then
 
     # Check for output *M1*MIEVLI*.FIT
     if [ ! -f *M1*MIEVLI*.FIT ] ;then
-        echo "*** No output from emchain for MOS1"
+        echo "*_* No output from emchain for MOS1"
     fi
 
 fi
@@ -175,7 +176,7 @@ if $run_emchain_mos2 ;then
 
     # Check for output *M2*MIEVLI*.FIT
     if [ ! -f *M2*MIEVLI*.FIT ] ;then
-        echo "*** No output from emchain for MOS2"
+        echo "*_* No output from emchain for MOS2"
     fi
 
 fi
@@ -190,7 +191,7 @@ if [[ -n "${event_chain_out[@]}" ]]; then
     echo
 else
     echo
-    echo "*** No output found for emchain or epchain"
+    echo "*_* No output found for emchain or epchain"
     echo "Cannot continue without event files"
     echo "Exiting"
     echo
@@ -305,14 +306,14 @@ elif [[ "${response}" == "mos2" ]] ;then
 
 elif [[ "${response}" == "skip" ]] ;then
     echo
-    echo "*** Skipping diagnostic image creation"
+    echo "*_* Skipping diagnostic image creation"
     echo
 else
 
     echo
     echo "Desired detectors not explicitly given"
     echo "(all lowercase expected)"
-    echo "*** Exiting without creating diagnostic images"
+    echo "*_* Exiting without creating diagnostic images"
     echo
     return 1 2> /dev/null || exit 1
 fi
@@ -364,7 +365,7 @@ for E in ${exposures[@]}; do
     ## It must be an unscheduled or multi-exposure observation
     if [ "${sched_flag}" = "${sched_flag#[Ss]}" ] ;then
         echo
-        echo "*** sched_flag attribute of exposure ${E} is unscheduled (U) or multi-exposure (X)"
+        echo "*_* sched_flag attribute of exposure ${E} is unscheduled (U) or multi-exposure (X)"
         echo "Aborting this exposure"
         echo
         continue
@@ -412,14 +413,18 @@ for E in ${exposures[@]}; do
         ## We can then wait for the background process to finish before running ds9
         wait $!
 
-        ## DS9 export images
-        ds9 "${PWD}/${in_file_lead}${diagn_suffix}.FIT" -scale log -cmap heat -zoom to fit -saveimage png "${PWD}/${in_file_lead}${diagn_suffix}-${elo}-${ehi}.png" -exit &
-        wait $!
+        if [ -f ${PWD}/${in_file_lead}${diagn_suffix}.FIT ] ;then
+            ## DS9 export image(s)
+            ds9 "${PWD}/${in_file_lead}${diagn_suffix}.FIT" -scale log -cmap heat -zoom to fit -saveimage png "${PWD}/${in_file_lead}${diagn_suffix}-${elo}-${ehi}.png" -exit &
+            wait $!
+        else
+            continue
+        fi
 
         ## From the ESAS Cookbook V21.0; 5.9
         ## Examining CCDs for Anomalous States
         emanom eventfile="${in_file}" keepcorner=no # expected output is mos#S###-anom.log
-
+        ## *** Only 1 emanom file is left over per detector, doesn't leave one per exposure.....
         mv "${detector}${EXPOSURE}-anom.log" "${detector}${EXPOSURE}-diagn-anom.log"
 
         ## espfilt; From the ESAS Cookbook V21.0; 5.10
@@ -458,11 +463,19 @@ for E in ${exposures[@]}; do
 
         wait $!
 
-        ## DS9 export images
-        ds9 "${PWD}/${in_file_lead}${diagn_suffix}.FIT" -scale log -cmap heat -zoom to fit -saveimage png "${PWD}/${in_file_lead}${diagn_suffix}-${elo}-${ehi}.png" -exit &
-        wait $!
-        ds9 "${PWD}/${in_file_oot_lead}${diagn_suffix}.FIT" -scale log -cmap heat -zoom to fit -saveimage png "${PWD}/${in_file_oot_lead}${diagn_suffix}-${elo}-${ehi}.png" -exit &
-        wait $!
+        if [ -f ${PWD}/${in_file_lead}${diagn_suffix}.FIT ] ;then
+            ## DS9 export image(s)
+            ds9 "${PWD}/${in_file_lead}${diagn_suffix}.FIT" -scale log -cmap heat -zoom to fit -saveimage png "${PWD}/${in_file_lead}${diagn_suffix}-${elo}-${ehi}.png" -exit &
+            wait $!
+        else
+            continue
+        fi
+        if [ -f ${PWD}/${in_file_oot_lead}${diagn_suffix}.FIT ] ;then
+            ds9 "${PWD}/${in_file_oot_lead}${diagn_suffix}.FIT" -scale log -cmap heat -zoom to fit -saveimage png "${PWD}/${in_file_oot_lead}${diagn_suffix}-${elo}-${ehi}.png" -exit &
+            wait $!
+        else
+            continue
+        fi
 
         ## espfilt; From the ESAS Cookbook V21.0; 5.10
         ## Soft Proton Flare Filtering
@@ -474,18 +487,31 @@ for E in ${exposures[@]}; do
         withsmoothing=yes smooth=51 rangescale=15.0 allowsigma=3.0 method=histogram \
         withoot=Y ootfile=${in_file_oot} keepinterfiles=false
 
-        allevc_csv+=("${detector},${EXPOSURE},${detector}${EXPOSURE}-allevcoot.fits")
-
+        if [ -f ${detector}${EXPOSURE}-allevcoot.fits ] ;then
+            duration=$(gethead DURATION "${detector}${EXPOSURE}-allevcoot.fits")
+            allevc_csv+=("${detector},${EXPOSURE},${detector}${EXPOSURE}-allevcoot.fits,${duration}")
+        fi
     fi
 
-    allevc_csv+=("${detector},${EXPOSURE},${detector}${EXPOSURE}-allevc.fits")
-    gti_csv+=("${detector},${EXPOSURE},${detector}${EXPOSURE}-gti.fits")
+    if [ -f ${detector}${EXPOSURE}-allevc.fits ] ;then
+        duration=$(gethead DURATION "${detector}${EXPOSURE}-allevc.fits")
+        allevc_csv+=("${detector},${EXPOSURE},${detector}${EXPOSURE}-allevc.fits,${duration}")
+    fi
+    if [ -f ${detector}${EXPOSURE}-gti.fits ] ;then
+        ontime=$(gethead ONTIME "${detector}${EXPOSURE}-gti.fits")
+        gti_csv+=("${detector},${EXPOSURE},${detector}${EXPOSURE}-gti.fits,${ontime}")
+    fi
 
-    ## DS9 export images
-    ds9 "${PWD}/${detector}${EXPOSURE}-allimc.fits" -scale log -cmap heat -zoom to fit -saveimage png "${PWD}/${detector}${EXPOSURE}-diagn-allimc.png" -exit &
-    wait $!
-    ds9 "${PWD}/${detector}${EXPOSURE}-corimc.fits" -scale log -cmap heat -zoom to fit -saveimage png "${PWD}/${detector}${EXPOSURE}-diagn-corimc.png" -exit &
-    wait $!
+    if [ -f ${PWD}/${in_file_lead}${diagn_suffix}.FIT ] ;then
+        ## DS9 export image(s)
+        ds9 "${PWD}/${detector}${EXPOSURE}-allimc.fits" -scale log -cmap heat -zoom to fit -saveimage png "${PWD}/${detector}${EXPOSURE}-diagn-allimc.png" -exit &
+        wait $!
+    fi
+    if [ -f ${PWD}/${in_file_lead}${diagn_suffix}.FIT ] ;then
+    ## DS9 export image(s)
+        ds9 "${PWD}/${detector}${EXPOSURE}-corimc.fits" -scale log -cmap heat -zoom to fit -saveimage png "${PWD}/${detector}${EXPOSURE}-diagn-corimc.png" -exit &
+        wait $!
+    fi
 
     echo -e "\nhardcopy ${detector}${EXPOSURE}-diagn-hist.gif/gif \nexit" >> "${detector}${EXPOSURE}-hist.qdp"
     qdp "${detector}${EXPOSURE}-hist.qdp"

@@ -22,7 +22,7 @@ if [ $_CURRENT_DIR != "analysis" ]; then
         echo
         echo "Opted NOT to continue in current directory: ${_CURRENT_DIR}"
         echo "Please create an \"analysis\" directory to work from"
-        echo "*** Exiting"
+        echo "*_* Exiting"
         echo
         return 1 2> /dev/null || exit 1
     fi
@@ -47,7 +47,7 @@ if [ -d "./odf" ]; then
     popd
 else
     echo
-    echo "*** No odf directory found in parent of working directory"
+    echo "*_* No odf directory found in parent of working directory"
     echo "(where \"odf\" is expected to be lowercase)"
     echo "Popping back to working directory"
     popd
