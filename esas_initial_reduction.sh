@@ -22,12 +22,14 @@
 _SCRIPT=$( basename "${BASH_SOURCE[0]}" )
 _SCRIPT_PATH=$( dirname "${BASH_SOURCE[0]}" )
 _CURRENT_DIR="${PWD##*/}"
+_PARENT_DIR="${PWD%/*}"
 
 echo
 echo "<[^v^]>"
 echo "Executing script: ${_SCRIPT}"
 echo "From: ${_SCRIPT_PATH}"
 echo "In: ${_CURRENT_DIR}"
+echo "Of: ${_PARENT_DIR}"
 echo
 
 
@@ -420,6 +422,10 @@ for E in ${exposures[@]}; do
     guest_observer_mode_highlight="guest_observer_mode:${submode}"
     filter_highlight="filter_id:${filter}"
 
+    echo
+    echo "Starting exposure: ${detector}${EXPOSURE}"
+    echo
+
     #### Observation Mode check
     ## No information found for the complete listing of values for EPIC OBS_MODE
     ## Assuming <SLEW> and <POINTING>
@@ -514,7 +520,7 @@ for E in ${exposures[@]}; do
 
     ##
     ####
-        # If <detector> is still assigned, continue preparing diagnostic files for observation
+        # If no  is still assigned, continue preparing diagnostic files for observation
     ####
     ##
 

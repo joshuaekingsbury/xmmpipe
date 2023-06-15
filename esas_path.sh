@@ -17,12 +17,14 @@
 _SCRIPT=$( basename "${BASH_SOURCE[0]}" )
 _SCRIPT_PATH=$( dirname "${BASH_SOURCE[0]}" )
 _CURRENT_DIR="${PWD##*/}"
+_PARENT_DIR="${PWD%/*}"
 
 echo
 echo "<[^v^]>"
 echo "Executing script: ${_SCRIPT}"
 echo "From: ${_SCRIPT_PATH}"
 echo "In: ${_CURRENT_DIR}"
+echo "Of: ${_PARENT_DIR}"
 echo
 
 # Prompt user to check if current directory is acceptable to continue;
@@ -49,33 +51,37 @@ fi
 
 export SAS_CCF="${PWD}/ccf.cif"
 
-echo
-echo "Pushing to parent directory"
-pushd ..
+#echo
+#echo "Changing to parent directory"
+#pushd ..
+#cd "${_PARENT_DIR}"
 
 # Check for and retrieve odf directory; exit if not found in parent directory
-if [ -d "./odf" ]; then
+if [ -d "${_PARENT_DIR}/odf" ]; then
     echo
-    echo "Pushing to odf directory"
-    pushd ./odf
-    export SAS_ODF="${PWD}/"
+    #echo "Pushing to odf directory"
+    #pushd ./odf
+    echo "odf directory found in parent of working directory"
+    echo "Exporting SAS_ODF as:"
+    echo "${PWD}/odf"
+    export SAS_ODF="${_PARENT_DIR}/odf"
     echo
-    echo "Popping to parent directory"
-    popd
+    #echo "Popping to parent directory"
+    #popd
 else
     echo
     echo "<[*,*]> No odf directory found in parent of working directory"
     echo "(where \"odf\" is expected to be lowercase)"
-    echo "Popping back to working directory"
-    popd
+    #echo "Popping back to working directory"
+    #popd
     echo
     echo "Exiting"
     return 1 2> /dev/null || exit 1
 fi
 
-echo
-echo "Popping to working directory"
-popd
+#echo
+#echo "Popping to working directory"
+#popd
 
 echo
 echo "EXPORTED DIRECTORIES:"
