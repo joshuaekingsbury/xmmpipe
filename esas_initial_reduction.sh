@@ -7,6 +7,9 @@
 
 ## To be run after esas_path.sh ##
 
+## Pre-requisites
+## - WCSTools (For reading fits header info with <gethead>)
+
 ## This script runs the emchain and epchain commands for the initial data reduction,
 ##     generating the base event files for the detectors using the most recent CCF and SAS software
 ## Preprocessed versions of the event files are included in the observation data, but its recommended
@@ -37,7 +40,7 @@ echo
 # default is cookbook suggested "analysis" directory
 if [ "${_CURRENT_DIR}" != "analysis" ]; then
 
-    echo -n "Current directory is not 'analysis'. Continue anyway (y/n)?"
+    echo -n "Current directory is not 'analysis'. Continue anyway (y/n)? "
     read response
 
     # This grammar (the #[] operator) trims the first leading y or Y from the string
@@ -63,10 +66,10 @@ run_emchain_mos1=false
 run_emchain_mos2=false
 
 echo
-echo -n "Run chains for which EPIC detectors (all/pn/mos/mos1/mos2/skip)?"
+echo -n "Run chains for which EPIC detectors (all/pn/mos/mos1/mos2/skip)? "
 read response
 
-if [[ "${response}" == "all" ]] ;then
+if [ "${response}" = "all" ] ;then
     echo
     echo "Selected chains for all EPIC detectors"
     echo
@@ -75,7 +78,7 @@ if [[ "${response}" == "all" ]] ;then
     run_emchain_mos1=true
     run_emchain_mos2=true
 
-elif [[ "${response}" == "pn" ]] ;then
+elif [ "${response}" = "pn" ] ;then
 
     echo
     echo "Selected epchain for PN detector"
@@ -83,7 +86,7 @@ elif [[ "${response}" == "pn" ]] ;then
 
     run_epchain=true
 
-elif [[ "${response}" == "mos" ]] ;then
+elif [ "${response}" = "mos" ] ;then
 
     echo
     echo "Selected emchain for both MOS detectors"
@@ -92,7 +95,7 @@ elif [[ "${response}" == "mos" ]] ;then
     run_emchain_mos1=true
     run_emchain_mos2=true
 
-elif [[ "${response}" == "mos1" ]] ;then
+elif [ "${response}" = "mos1" ] ;then
 
     echo
     echo "Selected emchain for MOS1 detector"
@@ -100,7 +103,7 @@ elif [[ "${response}" == "mos1" ]] ;then
 
     run_emchain_mos1=true
 
-elif [[ "${response}" == "mos2" ]] ;then
+elif [ "${response}" = "mos2" ] ;then
 
     echo
     echo "Selected emchain for MOS2 detector"
@@ -108,7 +111,7 @@ elif [[ "${response}" == "mos2" ]] ;then
 
     run_emchain_mos2=true
 
-elif [[ "${response}" == "skip" ]] ;then
+elif [ "${response}" = "skip" ] ;then
     echo
     echo "<[*,*]> Skipping e%chains"
     echo
@@ -136,6 +139,10 @@ if $run_epchain ;then
     ## From the ESAS Cookbook V21.0; 5.7
 
     ## For now
+    echo
+    echo "Running a pre-check with epchain to se how many pn exposures exist:"
+    echo
+
     epchain exposure=99 | tee "./_epchain_exposure_count_diagn.txt"
     ##
 
@@ -255,7 +262,9 @@ printf "%s\n" "${exposures[@]}"
 
 
 ##
-## Preparing to run evselect for diagnostic images
+####
+    # Preparing to run evselect for diagnostic images
+####
 ##
 
 # Check if want to skip again or specify detector
@@ -266,7 +275,7 @@ if [ "${response}" = "skip" ] ;then
     echo
 
     echo
-    echo -n "Make diagnostic images for which EPIC detectors (all/pn/mos/mos1/mos2/skip)?"
+    echo -n "Make diagnostic images for which EPIC detectors (all/pn/mos/mos1/mos2/skip)? "
     read response
 fi
 
@@ -334,7 +343,7 @@ fi
 # File suffix for <evselect> diagnostic images
 diagn_suffix="-diagn-det-unfilt"
 
-for E in ${exposures[@]}; do
+for E in "${exposures[@]}"; do
 
     ## Prepare file string variations for different parts of the pipeline
     # Uppercase strings
@@ -374,7 +383,7 @@ for E in ${exposures[@]}; do
 
     ##
     ####
-        # Identify event file(s) and procede with processing
+        # Identify event file(s) and proceed with processing
     ####
     ##
 
@@ -433,8 +442,8 @@ for E in ${exposures[@]}; do
         observation_mode_highlight="${observation_mode_highlight} ( <[*,*]> WARNING : Event file deleted )"
 
         echo
-        echo "<[*,*]> submode is not PrimeFullWindow"
-        echo "Observation Mode: ${submode}"
+        echo "<[*,*]> Observation mode is not POINTING"
+        echo "Observation Mode: ${obs_mode}"
         echo
         echo "Warning added to: ${highlights_outfile}"
         echo
@@ -520,7 +529,7 @@ for E in ${exposures[@]}; do
 
     ##
     ####
-        # If no  is still assigned, continue preparing diagnostic files for observation
+        # If exit_early not triggered, continue preparing diagnostic files for observation
     ####
     ##
 
@@ -528,6 +537,7 @@ for E in ${exposures[@]}; do
     in_file="${exposure_prefix}.FIT"
     cp "${event_file}" "${in_file}"
 
+    # Energy range just used for "quick look" diagnostic images
     elo=300
     ehi=1000
 
