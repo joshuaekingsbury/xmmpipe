@@ -169,6 +169,17 @@ else
     return 1 2> /dev/null || exit 1
 fi
 
+echo
+echo -n "Continue with the listed event files?"
+read answer
+
+if [ "$answer" != "${answer#[Yy]}" ] ;then # this grammar (the #[] operator) means that the variable $answer where any Y or y in 1st position will be dropped if they exist.
+    echo Yes
+else
+    echo No
+    return 1 2> /dev/null || exit 1
+fi
+
 
 ##
 ## Build i/o file names, and run <evigweight> if detector selected

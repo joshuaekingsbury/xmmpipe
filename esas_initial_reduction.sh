@@ -21,11 +21,14 @@
 
 ## Script start tagged by: <[^v^]>
 ## Warnings tagged by: <[*,*]>
+## WIP tagged by: ***
+## Steps tagged by: ---
 
 _SCRIPT=$( basename "${BASH_SOURCE[0]}" )
 _SCRIPT_PATH=$( dirname "${BASH_SOURCE[0]}" )
 _CURRENT_DIR="${PWD##*/}"
 _PARENT_DIR="${PWD%/*}"
+
 
 echo
 echo "<[^v^]>"
@@ -36,7 +39,12 @@ echo "Of: ${_PARENT_DIR}"
 echo
 
 
-# Prompt user to check if current directory is acceptable to continue;
+#### ---
+##
+    # Prompt user to check if current directory is acceptable to begin/continue processing
+##
+####
+
 # default is cookbook suggested "analysis" directory
 if [ "${_CURRENT_DIR}" != "analysis" ]; then
 
@@ -61,13 +69,115 @@ if [ "${_CURRENT_DIR}" != "analysis" ]; then
 
 fi
 
+#### ---
+##
+    # Make directories for housekeeping
+##
+####
+
+if [ ! -d intermediates ]; then
+    mkdir intermediates
+    mkdir intermediates/chain
+    mkdir intermediates/espfilt
+fi
+if [ ! -d logs ]; then
+    mkdir logs
+fi
+if [ ! -d diagnostics ]; then
+    mkdir diagnostics
+fi
+if [ ! -d images ]; then
+    mkdir images
+fi
+
+#### ---
+##
+    # Energy ranges of final output fits files (applied after proton flare filtering)
+    #   Note: espfilt does not limit energy range of output
+    #         The ranges below are used to create new files over energy ranges of interest
+##
+####
+
+mos1_elo=1500
+mos1_ehi=10000
+
+mos2_elo=1500
+mos2_ehi=10000
+
+pn_elo=500
+pn_ehi=10000
+
+
+#### ---
+##
+    # Event pattern and detector region flags *** Not used yet
+##
+####
+
+pattern_mos="(PATTERN <= 12)"
+flag_mos_full="((FLAG & 0x766aa000)==0)"
+flag_mos_fov="(#XMMEA_EM)"
+flag_mos_corner="((FLAG & 0x766aa000)==0)&&!(CIRCLE(435,1006,17100,DETX,DETY)||CIRCLE(-34,68,17700,DETX,DETY)||BOX(-20,-17000,6500,500,0,DETX,DETY)||BOX(5880,-20500,7500,1500,10,DETX,DETY)||BOX(-5920,-20500,7500,1500,350,DETX,DETY)||BOX(-20,-20000,5500,500,0,DETX,DETY))"
+
+pattern_pn_double_down="(PATTERN <= 4)"
+pattern_pn_single="(PATTERN == 0)"
+flag_pn_full="(#XMMEA_EP)"
+flag_pn_fov="((FLAG & 0xfb0000)==0)"
+flag_pn_corner="(#XMMEA_EP)&&!((DETX,DETY) in circle(-2200,-1100,18080))"
+
+
+#### ---
+##
+    # Prompt user for which detectors base event files should be prepared for
+    #   and then run e%chain for those detectors
+    # Menu option for ccd selection has been added (MOS only for now)
+##
+####
+
 run_epchain=false
 run_emchain_mos1=false
 run_emchain_mos2=false
 
+select_ccds=false
+ccds=""
+
+mos_ccds_auto=false
+mos_ccd_states="G"
+
+
 echo
-echo -n "Run chains for which EPIC detectors (all/pn/mos/mos1/mos2/skip)? "
+echo -n "Run chains for which EPIC detectors (all/pn/mos/mos1/mos2/ccds/skip)? "
 read response
+
+if [ "${response}" = "ccds" ] ;then
+    select_ccds=true
+
+    echo
+    echo -n "Run chain and modify CCDs of which EPIC detector (all_auto/mos1/mos2/mos1_auto/mos2_auto)? "
+    read ccd_response
+
+    response="${ccd_response%'_'*}" ## Pass through the detector selection to <response> (all/mos1/mos2)
+
+    if [ "${ccd_response#*'_'}" = "auto" ] ;then
+        mos_ccds_auto=true
+    else
+        echo
+        echo "Enter CCDs on one line (This script does not yet validate CCD entry format)"
+        echo "PN format example for CCD 1, 4, & 8:"
+        echo "NOT IMPLEMENTED HERE YET"
+        echo
+        echo "MOS format example for CCD 1, 4, & 8:"
+        echo "1 4 8"
+        echo -n "Enter now:\n"
+        read ccd_response
+
+        echo
+        echo "CCD string entered as:<${ccd_response}>"
+
+        ccds="${ccd_response}"
+    fi
+
+fi
 
 if [ "${response}" = "all" ] ;then
     echo
@@ -126,9 +236,14 @@ else
 fi
 
 
-# epchain package documentation recommends the following parameters and epchain order,
-#     then also states order of epchain calls is irrelevant
+# epchain package documentation recommends the following parameters and epchain order
+# The intermediate files are reused by the second epchain call,
+#   and then cleaned up by the second epchain call
 if $run_epchain ;then
+
+    ## Fixing (CONSTITUENT) error wg=hen running epchain in SAS v21.0;
+    ## "...the task radmonfix that it is not included in the SAS v21.0 binary distribution"
+    ## Fix @ https://195.169.141.9/web/xmm-newton/sas-watchout-2100-error-constituent
 
     echo
     echo "Running chains for PN detector"
@@ -140,15 +255,20 @@ if $run_epchain ;then
 
     ## For now
     echo
-    echo "Running a pre-check with epchain to se how many pn exposures exist:"
+    echo "Running a pre-check with epchain to see how many pn exposures exist:"
     echo
 
     epchain exposure=99 | tee "./_epchain_exposure_count_diagn.txt"
     ##
 
-    ## (CONSTITUENT) error in SAS v21.0;
-    ## "...the task radmonfix that it is not included in the SAS v21.0 binary distribution"
-    ## Fix @ https://195.169.141.9/web/xmm-newton/sas-watchout-2100-error-constituent
+    ## Running epchain twice
+    ## Users Guide to the XMM-Newton Science Analysis System V17.0; 4.9
+    ##   OoT events are recorded by PN between integration intervals when the CCD is readout
+    ##   OoT events broaden spectral features and are wrongly reconstructed in PN images
+    ##   Up to 6.3% of events can be OoT depending on frame mode
+    ##   Simulating OoT events by this procedure is recommended "If highest spectral resolution is required"
+    ##   Section 4.9.2 shows impact on spectra
+
     epchain withoutoftime=Y keepintermediate=raw runradmonfix=N | tee "./_log_epchain_oot.txt"
 
     # Check for output *PN*OOEVLI*.FIT
@@ -176,7 +296,11 @@ if $run_emchain_mos1 ;then
     echo "Running chain for MOS1 detector"
     echo
 
-    emchain instruments=M1 | tee "./_log_emchain_mos1.txt"
+    if [ ! $select_ccds ] || [ $mos_ccds_auto ] ;then
+        emchain instruments=M1 | tee "./_log_emchain_mos1.txt"
+    else
+        emchain instruments=M1 ccds="${ccds}" | tee "./_log_emchain_mos1.txt"
+    fi
 
     # Check for output *M1*MIEVLI*.FIT
     if [ ! -f *M1*MIEVLI*.FIT ] ;then
@@ -193,6 +317,12 @@ if $run_emchain_mos2 ;then
 
     emchain instruments=M2 | tee ./_log_emchain_mos2.txt
 
+    if [ ! $select_ccds ] || [ $mos_ccds_auto ] ;then
+        emchain instruments=M2 | tee ./_log_emchain_mos2.txt
+    else
+        emchain instruments=M2 ccds="${ccds}" | tee ./_log_emchain_mos2.txt
+    fi
+
     # Check for output *M2*MIEVLI*.FIT
     if [ ! -f *M2*MIEVLI*.FIT ] ;then
         echo "<[*,*]> No output from emchain for MOS2"
@@ -200,10 +330,16 @@ if $run_emchain_mos2 ;then
 
 fi
 
+#### ---
+##
+    # Find e%chain output event files
+##
+####
+
 # Check for ANY event files output from e%chain; exit if none found
 event_chain_out=($( find . -maxdepth 1 -type f -name '*EVLI*.FIT' ))
 # Evaluate
-if [[ -n "${event_chain_out[@]}" ]]; then
+if [[ -n "${event_chain_out[@]}" ]] ;then
     echo
     echo "e%chain outputs found"
     printf "%s\n" "${event_chain_out[@]}"
@@ -217,26 +353,12 @@ else
     return 1 2> /dev/null || exit 1
 fi
 
-# Get arrays of *.FIT files including/excluding e%chain output event files *EVLI*.FIT 
-chain_out=($( find . -maxdepth 1 -type f -name '*.FIT' ))
-intermediate_chain_out=($( find . -maxdepth 1 -type f -name '*.FIT' -not -name '*EVLI*.FIT' ))
-# Cp all e%chain outputs to intermediate directory
-for i in "${chain_out[@]}"
-do
-    cp "${i}" intermediates/chain
-done
-
-# Rm e%chain intermediates from working directory
-for i in "${intermediate_chain_out[@]}"
-do
-    rm "${i}"
-done
-
+#### ---
 ##
-## Build event file names
+    # List detectors and exposures found from newly created event files
 ##
+####
 
-# List detectors and exposures found from event files
 echo
 echo "Detectors and Exposures Found:"
 echo
@@ -244,7 +366,7 @@ echo
 # Get list of files containing *EVLI*.FIT
 # Using event_chain_out from earlier
 exposures=()
-for f in "${event_chain_out[@]}"; do
+for f in "${event_chain_out[@]}" ;do
 
     instrume=$(gethead INSTRUME "${f}") # EMOS1, EMOS2, EPN
     instrume="${instrume:1}" # MOS1, MOS2, PN
@@ -254,28 +376,92 @@ for f in "${event_chain_out[@]}"; do
     exposures+=("${instrume}${expid}")
 done
 
-# Get unique detector/exposure combos (removing pn-oot)
+## Get unique detector/exposure combos (removing pn-oot)
 exposures=( $(printf "%s\n" "${exposures[@]}" | sort -u) )
 
 #echo "${exps_lower[@]}"
 printf "%s\n" "${exposures[@]}"
 
 
+#### ---
+##
+    # Function to create full-band FOV preview images of key products (WIP) ***
+    # Parameter(s):
+    #   - <event_file> name
 ##
 ####
-    # Preparing to run evselect for diagnostic images
-####
+
+create_event_file_images (){
+
+    if [ ! -f "${PWD}/$1" ] ;then
+        echo "File <$1> not found"
+        echo "No images created"
+        return 1
+    fi
+
+    fname=$1
+    fname="${fname%.*}"
+
+    instrume=$(gethead INSTRUME "$1") # EMOS1, EMOS2, EPN
+    instrume="${instrume:1:1}" # M, M, P
+
+    event_pattern=""
+    area_flag=""
+
+    if [ "${instrume}" == "M" ] ;then
+        event_pattern="PATTERN <= 12"
+        area_flag="#XMMEA_EM" ## FOV only; Excludes corner events; (FLAG & 0x766aa000)==0 is entire FOV
+    elif [ "${instrume}" == "P" ] ;then
+        event_pattern="PATTERN <= 4"
+        area_flag="(FLAG & 0xfb0000)==0" ## FOV only; Excludes corner events; #XMMEA_EP is entire FOV
+    else
+        echo "Detector undetermined for given event file"
+        echo "File: ${fname}"
+        echo "No images created"
+        return 1
+    fi
+
+    preview_sky_prefix="${fname}-im-sky"
+
+    evselect table="$1" withimageset=yes imageset="${preview_sky_prefix}.fits" \
+    filtertype=expression expression="($event_pattern)&&($area_flag)" \
+    ignorelegallimits=yes imagebinning=imageSize \
+    xcolumn=X ximagesize=780 ximagemax=50000 ximagemin=1 \
+    ycolumn=Y yimagesize=780 yimagemax=50000 yimagemin=1 | tee "./_log_${preview_sky_prefix}_evselect.txt" &
+
+    wait $!
+    mv ${preview_sky_prefix}.fits images
+
+    preview_det_prefix="${fname}-im-det"
+
+    evselect table="$1" withimageset=yes imageset="${preview_det_prefix}.fits" \
+    filtertype=expression expression="($event_pattern)&&($area_flag)" \
+    ignorelegallimits=yes imagebinning=imageSize \
+    xcolumn=DETX ximagesize=780 ximagemax=19500 ximagemin=-19499 \
+    ycolumn=DETY yimagesize=780 yimagemax=19500 yimagemin=-19499 | tee "./_log_${preview_det_prefix}_evselect.txt" &
+
+    wait $!
+    mv ${preview_det_prefix}.fits images
+
+}
+
+#### ---
 ##
+    # Ask user to continue for diagnostic images, filtering, and energy cuts
+##
+####
 
 # Check if want to skip again or specify detector
 if [ "${response}" = "skip" ] ;then
     echo
-    echo "Preparing to run evselect for diagnostic images"
-    echo "prior to espfilt"
+    echo "Preparing to run:"
+    echo "  - evselect for diagnostic images"
+    echo "  - espfilt for proton flare time filtering"
+    echo "  - evselect for energy range cuts to espfilt output"
     echo
 
     echo
-    echo -n "Make diagnostic images for which EPIC detectors (all/pn/mos/mos1/mos2/skip)? "
+    echo -n "Generate diagnostics and filter which EPIC detectors (all/pn/mos/mos1/mos2/skip)? "
     read response
 fi
 
@@ -285,7 +471,7 @@ fi
 
 if [ "${response}" = "all" ] ;then
     echo
-    echo "Creating diagnostic images for all found exposures"
+    echo "Creating diagnostic images for and filtering all found exposures"
     echo
 
     diagnostic_pn_event=true
@@ -295,7 +481,7 @@ if [ "${response}" = "all" ] ;then
 elif [ "${response}" = "pn" ] ;then
 
     echo
-    echo "Creating diagnostic images for PN exposures"
+    echo "Creating diagnostic images for and filtering PN exposures"
     echo
 
     diagnostic_pn_event=true
@@ -303,7 +489,7 @@ elif [ "${response}" = "pn" ] ;then
 elif [ "${response}" = "mos" ] ;then
 
     echo
-    echo "Creating diagnostic images for both MOS exposures"
+    echo "Creating diagnostic images for and filtering both MOS exposures"
     echo
 
     diagnostic_mos1_event=true
@@ -312,7 +498,7 @@ elif [ "${response}" = "mos" ] ;then
 elif [ "${response}" = "mos1" ] ;then
 
     echo
-    echo "Creating diagnostic images for MOS1 exposures"
+    echo "Creating diagnostic images for and filtering MOS1 exposures"
     echo
 
     diagnostic_mos1_event=true
@@ -320,14 +506,14 @@ elif [ "${response}" = "mos1" ] ;then
 elif [ "${response}" = "mos2" ] ;then
 
     echo
-    echo "Creating diagnostic images for MOS2 exposures"
+    echo "Creating diagnostic images for and filtering MOS2 exposures"
     echo
 
     diagnostic_mos2_event=true
 
 elif [ "${response}" = "skip" ] ;then
     echo
-    echo "<[*,*]> Skipping diagnostic image creation"
+    echo "<[*,*]> Skipping diagnostic image creation and filtering"
     echo
 else
 
@@ -335,13 +521,14 @@ else
     echo "Desired detectors not explicitly given"
     echo "Accepted inputs are: all/pn/mos/mos1/mos2/skip"
     echo "(all lowercase expected)"
-    echo "<[*,*]> Exiting without creating diagnostic images"
+    echo "<[*,*]> Exiting without creating diagnostic images nor filtering"
     echo
     return 1 2> /dev/null || exit 1
 fi
 
 # File suffix for <evselect> diagnostic images
 diagn_suffix="-diagn-det-unfilt"
+
 
 for E in "${exposures[@]}"; do
 
@@ -381,11 +568,11 @@ for E in "${exposures[@]}"; do
         if [ "${detector}" = "mos2" ] ;then continue ;fi
     fi
 
+    #### ---
     ##
-    ####
         # Identify event file(s) and proceed with processing
-    ####
     ##
+    ####
 
     event_file=""
     event_file_oot=""
@@ -401,11 +588,14 @@ for E in "${exposures[@]}"; do
 
     fi
 
+    #### ---
     ##
-    ####
         # Check header for reasons a specific exposure may be unusable or problematic
-    ####
+        # Create array for logging diagnostic info for current event file:
+        #   If a property of the exposure is outside the bounds of this pipeline script,
+        #     trigger <exit_early> and skip this exposure after writing out <detector_highlights>
     ##
+    ####
 
     ## Gather detector header highlights
     obs_id=$(gethead OBS_ID "${event_file}")
@@ -516,6 +706,8 @@ for E in "${exposures[@]}"; do
     fi
     detector_highlights+=("${filter_highlight}")
 
+    detector_highlights+=("ccds:${ccds} (All selected if none shown here)")
+
     if $exit_early ;then
         detector_highlights+=("ABORTED")
 
@@ -527,25 +719,149 @@ for E in "${exposures[@]}"; do
         continue
     fi
 
+    #### ---
+    ##
+        # If exit_early not triggered, continue creating diagnostic files (+) for observation/exposure
     ##
     ####
-        # If exit_early not triggered, continue preparing diagnostic files for observation
-    ####
-    ##
 
     exposure_prefix="${detector}${EXPOSURE}"
     in_file="${exposure_prefix}.FIT"
+    in_file_allccds="${exposure_prefix}_allccds.FIT"
     cp "${event_file}" "${in_file}"
+    cp "${event_file}" "${in_file_allccds}"
 
-    # Energy range just used for "quick look" diagnostic images
-    elo=300
-    ehi=1000
+    # Energy range for proton-flare-filtering; defaults from <espfilt> documentation
+    esp_elo=2500 # default: 2500 ; ESAS Cookbook: 2500
+    esp_ehi=8500 # default: 8000 ; ESAS Cookbook: 8500
+    detector_highlights+=("espfilt_elow:${esp_elo}")
+    detector_highlights+=("espfilt_ehigh:${esp_ehi}")
+
+    # Energy ranges used for "quick look" diagnostic images (anom CCDs and arcing)
+    anom_elo=300
+    anom_ehi=1000
+    #arc_elo= ## Placeholder when I estimate energy ranges of arcing ***
+    #arc_ehi=
+
+    # Energy ranges used for filtering final output
+    det_elo=0
+    det_ehi=12000
+
+    event_pattern=""
+    area_flag=""
 
     if [ "${detector}" = "mos1" ] || [ "${detector}" = "mos2" ] ;then
-        ## From the ESAS Cookbook V21.0; 5.8
+
+        if [ "${detector}" = "mos1" ] ;then
+            det_elo="${mos1_elo}"
+            det_ehi="${mos1_ehi}"
+        fi
+
+        if [ "${detector}" = "mos2" ] ;then
+            det_elo="${mos2_elo}"
+            det_ehi="${mos2_ehi}"
+        fi
+
+        event_pattern="${pattern_mos}"
+        area_flag="${flag_mos_full}"
+
+        #### ---
+        ##
+            # Running <emanom> to run a basic check of the MOS CCDs for anomalous behavior
+            # "Data above 2 keV are unaffected" (ESAS Cookbook V21.0; 5.9)
+            # <emanom> task added to goflib 05-11-2020
+        ##
+        ####
+
+        ## From the ESAS Cookbook V21.0; 5.9
         ## Examining CCDs for Anomalous States
-        evselect table="${in_file}" withimageset=yes imageset="${exposure_prefix}${diagn_suffix}".FIT \
-        filtertype=expression expression="(PI in [$elo:$ehi])&&(PATTERN<=12)&&((FLAG & 0x766aa000)==0)" \
+        ## Writes estimated ccd states/flags to header of <event_file> as keys <ANOMFLn>
+        ## NOTE: Documentation examples section shows "eventset" instead of "eventfile" (correct) for param
+
+        emanom eventfile="${event_file}" keepcorner=no # expected output is mos#S###-anom.log
+        mv "${detector}${EXPOSURE}-anom.log" "${detector}${EXPOSURE}-diagn-anom-allccd.log"
+
+        #### ---
+        ##
+            # If auto reprocessing to exclude anomalous CCDS
+            #   - Get anomalous CCD states assigned by emanom
+            #   - Remove previous e%chain output
+            #   - emchain again with ccds
+        ##
+        ####
+
+        if $mos_ccds_auto ;then
+            ANOMFL2=$(gethead ANOMFL2 "${event_file}")
+            ANOMFL3=$(gethead ANOMFL3 "${event_file}")
+            ANOMFL4=$(gethead ANOMFL4 "${event_file}")
+            ANOMFL5=$(gethead ANOMFL5 "${event_file}")
+            ANOMFL6=$(gethead ANOMFL6 "${event_file}")
+            ANOMFL7=$(gethead ANOMFL7 "${event_file}")
+
+            ccds="1"
+            if [ "${ANOMFL2%[$mos_ccd_states]*}" = "" ] ;then ccds=$ccds" 2" ;fi
+            if [ "${ANOMFL3%[$mos_ccd_states]*}" = "" ] ;then ccds=$ccds" 3" ;fi
+            if [ "${ANOMFL4%[$mos_ccd_states]*}" = "" ] ;then ccds=$ccds" 4" ;fi
+            if [ "${ANOMFL5%[$mos_ccd_states]*}" = "" ] ;then ccds=$ccds" 5" ;fi
+            if [ "${ANOMFL6%[$mos_ccd_states]*}" = "" ] ;then ccds=$ccds" 6" ;fi
+            if [ "${ANOMFL7%[$mos_ccd_states]*}" = "" ] ;then ccds=$ccds" 7" ;fi
+
+            echo
+            echo "<emanom> estimated anomalous CCD states (2-7): "
+            echo "${ANOMFL2} ${ANOMFL3} ${ANOMFL4} ${ANOMFL5} ${ANOMFL6} ${ANOMFL7}"
+            echo
+            echo "Re-running chain for ${DETECTOR} detector with state selection: ${mos_ccd_states}"
+            echo "CCDs selected: ${ccds}"
+            echo
+        fi
+
+        # If re-chaining mos with auto ccds, clean directory of previous MOSn chain output
+        # Check for output *M%*MIEVLI*.FIT
+        if [ -f *${DTCTR}*MIEVLI*.FIT ] && $mos_ccds_auto ;then
+
+            # Get arrays of *${obs_id}*.FIT files excluding e%chain output <event> files *EVLI*.FIT
+            intermediate_chain_out=($( find . -maxdepth 1 -type f -name '*${obs_id}*.FIT' -not -name 'P*EVLI*.FIT' ))
+            # rm all old e%chain outputs
+            for i in "${intermediate_chain_out[@]}"
+            do
+                rm "${i}"
+            done
+            # rm previous MOSn emchain event file with all ccds
+            rm *"${DTCTR}"*MIEVLI*.FIT
+
+            wait $!
+        fi
+
+        if $select_ccds ;then
+            echo "${ccds}" > "${detector}${EXPOSURE}-emchain-ccds.txt"
+            create_event_file_images "${in_file_allccds}"
+        fi
+
+        if $mos_ccds_auto ;then
+
+            emchain instruments="${DTCTR}" exposures="${EXPOSURE}" ccds="${ccds}" | tee "./_log_emchain_${detector}_anom.txt" &
+            wait $!
+
+            # ## Update new e%chain output with CCD states, and add "diagn" tag to <emanom> log
+            emanom eventfile="${event_file}" keepcorner=no # expected output is mos#S###-anom.log
+            # ## *** Only 1 emanom log file is left over per detector, doesn't leave one per exposure.....?
+            mv "${detector}${EXPOSURE}-anom.log" "${detector}${EXPOSURE}-diagn-anom.log"
+
+            # Check for output *M%*MIEVLI*.FIT
+            if [ -f *${DTCTR}*MIEVLI*.FIT ] ;then
+                cp "${event_file}" "${in_file}" # Overwrite <in_file> from allccds to ccds
+            else
+                echo "<[*,*]> No output found from emchain for ${DETECTOR} with CCD selection"
+            fi
+        fi
+
+        ## From the ESAS Cookbook V21.0; 5.8
+        ## Examining MOS CCDs for Anomalous States from 300-1000 keV (assigned above)
+
+        ## Even if only interested in analysis >1.5 keV where anom state doesn't affect data,
+        ##   also create images to check for scattering arcs (NOT YET IMPLEMENTED)
+        evselect table="${in_file}" withimageset=yes imageset="${exposure_prefix}${diagn_suffix}".fits \
+        filtertype=expression expression="(PI in [$anom_elo:$anom_ehi])&&($event_pattern)&&($area_flag)" \
         ignorelegallimits=yes imagebinning=imageSize \
         xcolumn=DETX ximagesize=780 ximagemax=19500 ximagemin=-19499 \
         ycolumn=DETY yimagesize=780 yimagemax=19500 yimagemin=-19499 | tee "./_log_${exposure_prefix}_evselect.txt" &
@@ -555,28 +871,26 @@ for E in "${exposures[@]}"; do
         ## We can then wait for the background process to finish before running ds9
         wait $!
 
-        if [ -f "${PWD}/${exposure_prefix}${diagn_suffix}.FIT" ] ;then
+        if [ -f "${PWD}/${exposure_prefix}${diagn_suffix}.fits" ] ;then
             ## DS9 export image(s)
-            ds9 "${PWD}/${exposure_prefix}${diagn_suffix}.FIT" -scale log -cmap heat -zoom to fit -saveimage png "${PWD}/${exposure_prefix}${diagn_suffix}-${elo}-${ehi}.png" -exit &
+            ds9 "${PWD}/${exposure_prefix}${diagn_suffix}.fits" -scale log -cmap heat -zoom to fit -saveimage png "${PWD}/${exposure_prefix}${diagn_suffix}-${anom_elo}-${anom_ehi}.png" -exit &
             wait $!
         else
             continue
         fi
 
-        ## From the ESAS Cookbook V21.0; 5.9
-        ## Examining CCDs for Anomalous States
-        emanom eventfile="${in_file}" keepcorner=no # expected output is mos#S###-anom.log
-        ## *** Only 1 emanom file is left over per detector, doesn't leave one per exposure.....
-        mv "${detector}${EXPOSURE}-anom.log" "${detector}${EXPOSURE}-diagn-anom.log"
+        ## Pre-espfilt images
+        create_event_file_images "${in_file}"
 
         ## espfilt; From the ESAS Cookbook V21.0; 5.10
         ## Soft Proton Flare Filtering
+        ##   Procedure checks flaring at high energies independently of output elow/ehigh range provided
 
         # "If there is a bright extended source in the FOV,
         # increasing the rangescale to 10 for the MOS
         # and 25 for the pn may be necessary to get a good fit."
         #     default rangescale=6.0
-        espfilt eventfile="${in_file}" elow=2500 ehigh=8500 \
+        espfilt eventfile="${in_file}" elow="${esp_elo}" ehigh="${esp_ehi}" \
         withsmoothing=yes smooth=51 rangescale=6.0 allowsigma=3.0 method=histogram \
         keepinterfiles=false | tee "./_log_${exposure_prefix}_espfilt.txt"
 
@@ -588,57 +902,103 @@ for E in "${exposures[@]}"; do
         in_file_oot="${exposure_prefix_oot}.FIT"
         cp "${event_file_oot}" "${in_file_oot}"
 
-        ## From the ESAS Cookbook V21.0; 5.8
-        ## Examining CCDs for Anomalous States
-        evselect table="${in_file}" withimageset=yes imageset="${exposure_prefix}${diagn_suffix}".FIT \
-        filtertype=expression expression="(PI in [$elo:$ehi])&&(PATTERN <= 4)&&(#XMMEA_EP)" \
+        det_elo="${pn_elo}"
+        det_ehi="${pn_ehi}"
+
+        event_pattern="${pattern_pn_double_down}"
+        area_flag="${flag_pn_full}"
+
+        ## Users Guide to the XMM-Newton Science Analysis System V17.0; 4.4.5
+        ##   Recommended to run <epspatialcti> for pn after epchain to correct for CTI effects
+        ##   (CTI: Charge Transfer Inefficiency)
+        ## Running here since we have <event_file> name(s) for input
+        ## *** Unsure if should run on both base and oot output of epchain
+        ## *** Holding off since shouldn't be applied to Extended Full Frame
+        ##       So this should be checked first on <submode>
+        ## epspatialcti
+
+
+        ## Creating preview images of PN at same energy range as MOS anomalous diagnostic images
+        ##   *** Change this later since (most of) this range exclude double-pixel events (PATTERN == 0)
+        evselect table="${in_file}" withimageset=yes imageset="${exposure_prefix}${diagn_suffix}".fits \
+        filtertype=expression expression="(PI in [$anom_elo:$anom_ehi])&&($event_pattern)&&($area_flag)" \
         ignorelegallimits=yes imagebinning=imageSize \
         xcolumn=DETX ximagesize=780 ximagemax=19500 ximagemin=-19499 \
         ycolumn=DETY yimagesize=780 yimagemax=19500 yimagemin=-19499 | tee "./_log_${exposure_prefix}_evselect.txt" &
 
         wait $!
 
-        evselect table="${in_file_oot}" withimageset=yes imageset="${exposure_prefix_oot}${diagn_suffix}".FIT \
-        filtertype=expression expression="(PI in [$elo:$ehi])&&(PATTERN <= 4)&&(#XMMEA_EP)" \
+        evselect table="${in_file_oot}" withimageset=yes imageset="${exposure_prefix_oot}${diagn_suffix}".fits \
+        filtertype=expression expression="(PI in [$anom_elo:$anom_ehi])&&($event_pattern)&&($area_flag)" \
         ignorelegallimits=yes imagebinning=imageSize \
         xcolumn=DETX ximagesize=780 ximagemax=19500 ximagemin=-19499 \
-        ycolumn=DETY yimagesize=780 yimagemax=19500 yimagemin=-19499 | tee "./_log_${exposure_prefix}_oot_evselect.txt" &
+        ycolumn=DETY yimagesize=780 yimagemax=19500 yimagemin=-19499 | tee "./_log_${exposure_prefix_oot}_evselect.txt" &
 
         wait $!
 
-        if [ -f "${PWD}/${exposure_prefix}${diagn_suffix}.FIT" ] ;then
+        if [ -f "${PWD}/${exposure_prefix}${diagn_suffix}.fits" ] ;then
             ## DS9 export image(s)
-            ds9 "${PWD}/${exposure_prefix}${diagn_suffix}.FIT" -scale log -cmap heat -zoom to fit -zoom to fit -saveimage png "${PWD}/${exposure_prefix}${diagn_suffix}-${elo}-${ehi}.png" -exit &
+            ds9 "${PWD}/${exposure_prefix}${diagn_suffix}.fits" -scale log -cmap heat -zoom to fit -zoom to fit -saveimage png "${PWD}/${exposure_prefix}${diagn_suffix}-${anom_elo}-${anom_ehi}.png" -exit &
             wait $!
         else
-            echo "${exposure_prefix}${diagn_suffix}.FIT not found for DS9 export"
+            echo "${exposure_prefix}${diagn_suffix}.fits not found for DS9 export"
         fi
-        if [ -f "${PWD}/${exposure_prefix_oot}${diagn_suffix}.FIT" ] ;then
-            ds9 "${PWD}/${exposure_prefix_oot}${diagn_suffix}.FIT" -scale log -cmap heat -zoom to fit -zoom to fit -saveimage png "${PWD}/${exposure_prefix_oot}${diagn_suffix}-${elo}-${ehi}.png" -exit &
+        if [ -f "${PWD}/${exposure_prefix_oot}${diagn_suffix}.fits" ] ;then
+            ds9 "${PWD}/${exposure_prefix_oot}${diagn_suffix}.fits" -scale log -cmap heat -zoom to fit -zoom to fit -saveimage png "${PWD}/${exposure_prefix_oot}${diagn_suffix}-${anom_elo}-${anom_ehi}.png" -exit &
             wait $!
         else
-            echo "${exposure_prefix_oot}${diagn_suffix}.FIT not found for DS9 export"
+            echo "${exposure_prefix_oot}${diagn_suffix}.fits not found for DS9 export"
         fi
+
+        ## Pre-espfilt images
+        create_event_file_images "${in_file}"
 
         ## espfilt; From the ESAS Cookbook V21.0; 5.10
         ## Soft Proton Flare Filtering
+        ##   Procedure checks flaring at high energies independently of output elow/ehigh range provided
 
         # "If there is a bright extended source in the FOV,
         # increasing the rangescale to 10 for the MOS
         # and 25 for the pn may be necessary to get a good fit."
         #     default rangescale=15.0
-        espfilt eventfile=${in_file} elow=2500 ehigh=8500 \
+        espfilt eventfile="${in_file}" elow="${esp_elo}" ehigh="${esp_ehi}" \
         withsmoothing=yes smooth=51 rangescale=15.0 allowsigma=3.0 method=histogram \
-        withoot=Y ootfile=${in_file_oot} keepinterfiles=false | tee "./_log_${exposure_prefix}_espfilt.txt"
+        withoot=Y ootfile="${in_file_oot}" keepinterfiles=false | tee "./_log_${exposure_prefix}_espfilt.txt"
 
-        if [ -f "${detector}${EXPOSURE}-allevcoot.fits" ] ;then
-            detector_highlights+=("espfilt_out_oot:${detector}${EXPOSURE}-allevcoot.fits")
-        fi
+        wait $!
+
     fi
+
+    #### ---
+    ##
+        # Check for espfilt outputs and if found:
+        #   - Create images
+        #   - Apply low and high energy cutoffs to events list of cleaned espfilt output
+    ##
+    ####
 
     exposure_allevc_out="${detector}${EXPOSURE}-allevc.fits"
     if [ -f "${exposure_allevc_out}" ] ;then
         detector_highlights+=("espfilt_out:${exposure_allevc_out}")
+
+        ## Post-espfilt images
+        create_event_file_images "${exposure_allevc_out}"
+
+        ## Applying elow/ehigh cutoffs to allevc
+        evselect table="${exposure_allevc_out}":EVENTS withfilteredset=yes \
+        expression="(PI in [$det_elo:$det_ehi])&&($event_pattern)&&($area_flag)" \
+        filteredset="${detector}${EXPOSURE}-evc-cut.fits" filtertype=expression keepfilteroutput=yes
+
+        ## *** store ELO/EHI in header for later processing, alongside EHIGH/ELOW stored by espfilt
+        ## *** http://tdc-www.harvard.edu/software/wcstools/sethead/sethead.ex.html
+
+        detector_highlights+=("cut_elow:${det_elo}")
+        detector_highlights+=("cut_ehigh:${det_ehi}")
+        detector_highlights+=("espfilt_out_cut:${detector}${EXPOSURE}-evc-cut.fits")
+
+        ## Post-espfilt *CUT* images
+        create_event_file_images "${detector}${EXPOSURE}-evc-cut.fits"
+
     else
         detector_highlights+=("espfilt_out:MISSING ( <[*,*]> WARNING )")
         echo
@@ -647,6 +1007,28 @@ for E in "${exposures[@]}"; do
         echo "Warning added to: ${highlights_outfile}"
         echo
     fi
+
+    if [ -f "${detector}${EXPOSURE}-allevcoot.fits" ] ;then
+        detector_highlights+=("espfilt_out_oot:${detector}${EXPOSURE}-allevcoot.fits")
+
+        ## Post-espfilt images
+        create_event_file_images "${detector}${EXPOSURE}-allevcoot.fits"
+
+        ## Applying elow/ehigh cutoffs to allevcoot
+        evselect table="${detector}${EXPOSURE}-allevcoot.fits":EVENTS withfilteredset=yes \
+        expression="(PI in [$det_elo:$det_ehi])&&($event_pattern)&&($area_flag)" \
+        filteredset="${detector}${EXPOSURE}-evcoot-cut.fits" filtertype=expression keepfilteroutput=yes
+
+        ## *** store ELO/EHI in header for later processing, alongside EHIGH/ELOW stored by espfilt
+        ## *** http://tdc-www.harvard.edu/software/wcstools/sethead/sethead.ex.html
+
+        detector_highlights+=("espfilt_out_oot_cut:${detector}${EXPOSURE}-evcoot-cut.fits")
+
+        ## Post-espfilt *CUT* images
+        create_event_file_images "${detector}${EXPOSURE}-evcoot-cut.fits"
+
+    fi
+
     exposure_gti_out="${detector}${EXPOSURE}-gti.fits"
     if [ -f "${exposure_gti_out}" ] ;then
         ontime=$(gethead ONTIME "${exposure_gti_out}")
@@ -657,14 +1039,14 @@ for E in "${exposures[@]}"; do
 
     if [ -f "${PWD}/${detector}${EXPOSURE}-allimc.fits" ] ;then
         ## DS9 export image(s)
-        ds9 "${PWD}/${detector}${EXPOSURE}-allimc.fits" -scale log -cmap heat -zoom to fit -saveimage png "${PWD}/${detector}${EXPOSURE}-diagn-allimc.png" -exit &
+        ds9 "${PWD}/${detector}${EXPOSURE}-allimc.fits" -scale log -cmap heat -zoom to fit -saveimage png "${PWD}/${detector}${EXPOSURE}-diagn-allimc-${esp_elo}-${esp_ehi}.png" -exit &
         wait $!
     else
         echo "${detector}${EXPOSURE}-allimc.fits not found for DS9 export"
     fi
     if [ -f "${PWD}/${detector}${EXPOSURE}-corimc.fits" ] ;then
         ## DS9 export image(s)
-        ds9 "${PWD}/${detector}${EXPOSURE}-corimc.fits" -scale log -cmap heat -zoom to fit -saveimage png "${PWD}/${detector}${EXPOSURE}-diagn-corimc.png" -exit &
+        ds9 "${PWD}/${detector}${EXPOSURE}-corimc.fits" -scale log -cmap heat -zoom to fit -saveimage png "${PWD}/${detector}${EXPOSURE}-diagn-corimc-${esp_elo}-${esp_ehi}.png" -exit &
         wait $!
     else
         echo "${detector}${EXPOSURE}-corimc.fits not found for DS9 export"
@@ -689,7 +1071,7 @@ for E in "${exposures[@]}"; do
     fi
 
     echo
-    echo "Diagnostic output complete for ${detector}${EXPOSURE}"
+    echo "Diagnostic and cleaning output complete for ${detector}${EXPOSURE}"
     echo "Check ${highlights_outfile} for exposure details"
     echo
 
@@ -702,9 +1084,26 @@ for E in "${exposures[@]}"; do
 
 done
 
+#### ---
 ##
-## Housekeeping
+    # Housekeeping
 ##
+####
+
+# Get arrays of P*.FIT files including/excluding e%chain output event files *EVLI*.FIT
+chain_out=($( find . -maxdepth 1 -type f -name 'P*.FIT' ))
+intermediate_chain_out=($( find . -maxdepth 1 -type f -name 'P*.FIT' -not -name 'P*EVLI*.FIT' ))
+# Cp all e%chain outputs to intermediate directory
+for i in "${chain_out[@]}"
+do
+    cp "${i}" intermediates/chain
+done
+
+# Rm e%chain intermediates from working directory
+for i in "${intermediate_chain_out[@]}"
+do
+    rm "${i}"
+done
 
 # Get arrays of diagnostic and log files to move
 diagnostic_files=($( find . -maxdepth 1 -type f -name '*diagn*' ))
@@ -724,7 +1123,7 @@ done
 # Sort espfilt outputs
 espfilt_out=($( find . -maxdepth 1 -type f -name '*.fits' ))
 qdp_espfilt_out=($( find . -maxdepth 1 -type f -name '*-hist.qdp' ))
-primary_espfilt_out=($( find . -maxdepth 1 -type f -name '*.fits' ! -name '*-allevc*.fits' ! -name '*-gti.fits' ))
+primary_espfilt_out=($( find . -maxdepth 1 -type f -name '*.fits' ! -name '*-allevc*.fits' ! -name '*-gti.fits' ! -name '*evc-*.fits' ))
 
 ## Copy, then move so I don't need mess with rm and primary files are retained in working dir
 

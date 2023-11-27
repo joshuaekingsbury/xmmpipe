@@ -2,6 +2,21 @@
 
 # Adapts region files listed in named file for every detector/exposure in current folder
 
+####
+##  Setup working directories
+####
+
+## Script start tagged by: <[^v^]>
+## Warnings tagged by: <[*,*]>
+## WIP tagged by: ***
+## Steps tagged by: ---
+
+_SCRIPT=$( basename "${BASH_SOURCE[0]}" )
+_SCRIPT_PATH=$( dirname "${BASH_SOURCE[0]}" )
+_CURRENT_DIR="${PWD##*/}"
+_PARENT_DIR="${PWD%/*}"
+
+
 # Requires wcstools
 shopt -s nullglob
 
@@ -78,7 +93,8 @@ while IFS= read -r line || [ -n "$line" ]; do
 
     for f in ${det_files[@]}; do
 
-        ./xmm_sky2det_regions.sh "$f" "$line.reg"
+        source $_SCRIPT_PATH/xmm_sky2phys_regions.sh "$f" "$line.reg" &
+        wait $!
         echo
         echo "$line: ${f%%\-*}"
 

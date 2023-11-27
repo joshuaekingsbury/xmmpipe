@@ -63,7 +63,7 @@ if [ -d "${_PARENT_DIR}/odf" ]; then
     #pushd ./odf
     echo "odf directory found in parent of working directory"
     echo "Exporting SAS_ODF as:"
-    echo "${PWD}/odf"
+    echo "${_PARENT_DIR}/odf"
     export SAS_ODF="${_PARENT_DIR}/odf"
     echo
     #echo "Popping to parent directory"
@@ -88,22 +88,6 @@ echo "EXPORTED DIRECTORIES:"
 echo "SAS_CCF=${SAS_CCF}"
 echo "SAS_ODF=${SAS_ODF}"
 echo
-
-if [ ! -d spectral_products ]; then
-    mkdir spectral_products
-fi
-if [ ! -d intermediates ]; then
-    mkdir intermediates
-    mkdir intermediates/chain
-    mkdir intermediates/espfilt
-    mkdir intermediates/filter
-fi
-if [ ! -d logs ]; then
-    mkdir logs
-fi
-if [ ! -d diagnostics ]; then
-    mkdir diagnostics
-fi
 
 
 echo
