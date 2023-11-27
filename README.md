@@ -8,6 +8,6 @@ Completed:
 esas_path.sh  
 esas_initial_reduction.sh  
 
-Working (not finalized):  
-esas_manual_flare.sh  
-esas_evigweight.sh  
+Working (not finalized):
+esas_manual_flare.sh
+esas_evigweight.sh
