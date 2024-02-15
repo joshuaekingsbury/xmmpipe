@@ -483,7 +483,7 @@ do
         build_include_set=false
         and_or="&&"
     fi
-    
+
     if [[ $initial_set == false && $set_switch == true ]]; then
         phys_reg_str_xmm=")$and_or$sign($phys_reg_str_xmm"
         set_switch=false

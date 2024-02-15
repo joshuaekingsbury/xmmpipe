@@ -81,10 +81,22 @@ fi
 
 obs_id=""
 
-
 #### ---
 ##
-    # Energy ranges of events for extracting spectra
+    # Energy ranges of response matrices
+    # For full energy range;
+    #   - MOS 0-11999
+    #   - PN  0-20479
+    #
+    ##  To generate spectrum in desired energy range, a selection expression must be used
+    ##  NOT withspecranges/specchannelmin/specchannelmax
+    #   - https://www.cosmos.esa.int/web/xmm-newton/sas-thread-pn-spectrum#cav
+
+    # Create expression for energy ranges of final output spectral files
+    # For full energy range;
+    #   - MOS 0-11999
+    #   - PN  0-20479
+
 ##
 ####
 
@@ -96,6 +108,7 @@ mos2_ehi=11999
 
 pn_elo=0
 pn_ehi=20479
+
 
 #### ---
 ##
@@ -140,34 +153,44 @@ flag_pn_corner="(#XMMEA_EP)&&!((DETX,DETY) in circle(-2200,-1100,18080))"
 
 #shopt -s nullglob
 
-region_files_list=${1:-"reg_files.txt"}
-## Check if input file exists
-##
-##
-
-echo
-echo "Region Files Listed in $region_files_list:"
-echo
-
 region_list=()
 
-# List region files in file
-# Updated to work with or without needing newline at end of txt file
-# https://unix.stackexchange.com/a/418067
-while IFS= read -r line || [ -n "$line" ]; do
+if [ -f "reg_files.txt" ] ;then
 
-    ## Check if file found
-    found=""
+    region_files_list=${1:-"reg_files.txt"}
 
-    ## If extract end after . is empty
-    ## append .reg and check if exists
+    echo
+    echo "Region Files Listed in $region_files_list:"
+    echo
 
-    printf '%s\n' "$line$found"
-    region_list+=("${line}")
-done < "$region_files_list"
+
+    # List region files in file
+    # Updated to work with or without needing newline at end of txt file
+    # https://unix.stackexchange.com/a/418067
+    while IFS= read -r line || [ -n "$line" ] ;do
+
+        ## Check if file found
+        found=""
+
+        ## If extract end after . is empty
+        ## append .reg and check if exists
+
+        printf '%s\n' "$line$found"
+        region_list+=("${line}")
+    done < "$region_files_list"
+
+else
+
+    echo
+    echo "<[*,*]> File Not Found For Regions List: $region_files_list"
+    echo
+
+    return 1 2> /dev/null || exit 1
+
+fi
 
 echo
-echo -n "Continue with the listed regions files?"
+echo -n "Continue with the region selection above?"
 read answer
 
 if [ "$answer" != "${answer#[Yy]}" ] ;then # this grammar (the #[] operator) means that the variable $answer where any Y or y in 1st position will be dropped if they exist.
@@ -182,7 +205,14 @@ fi
 ##
     # Prompt user for which detectors base event files should be prepared for
     #   and then run e%chain for those detectors
-    # Menu option for ccd selection has been added (MOS only for now)
+    # REMOVED: Menu option for ccd selection has been added (MOS only for now)
+    #   and was only partially implemented
+    ## NOTE: While using (CCDNR==N) works in selection expression of evselect
+    ##         rmfgen and arfgen fail for SAS pipeline if X/Y or DETX/DETY or regions
+    ##         are not used to explicitly specify pixels according to DSS(lib)
+    ## ERROR:
+    ##   ** rmfgen: error (RegionInvalid), DSS regions defined in X/Y and DETX/DETY
+    ##     space are unbounded. The ARF can not be calculated
 ##
 ####
 
@@ -198,38 +228,50 @@ extract_mos2=false
 
 
 echo
-echo -n "Extract spectra for which EPIC detectors (all/pn/mos/mos1/mos2/ccds/skip)? "
+#echo -n "Extract spectra for which EPIC detectors (all/pn/mos/mos1/mos2/ccds/skip)? "
+echo -n "Extract spectra for which EPIC detectors (all/pn/mos/mos1/mos2/skip)? "
 read response
 
-if [ "${response}" = "ccds" ] ;then
-    select_ccds=true
+# if [ "${response}" = "ccds" ] ;then
+#     select_ccds=true
 
-    echo
-    echo -n "Extract spectra for CCDs of which EPIC detector (all_auto/mos1/mos2/mos1_auto/mos2_auto)? "
-    read ccd_response
+#     echo
+#     echo -n "Extract spectra for CCDs of which EPIC detector (all_auto/mos1/mos2/mos1_auto/mos2_auto)? "
+#     read ccd_response
 
-    response="${ccd_response%'_'*}" ## Pass through the detector selection to <response> (all/mos1/mos2)
+#     response="${ccd_response%'_'*}" ## Pass through the detector selection to <response> (all/mos1/mos2)
 
-    if [ "${ccd_response#*'_'}" = "auto" ] ;then
-        mos_ccds_auto=true
-    else
-        echo
-        echo "Enter CCDs on one line (This script does not yet validate CCD entry format)"
-        echo "PN format example for CCD 1, 4, & 8:"
-        echo "NOT IMPLEMENTED HERE YET"
-        echo
-        echo "MOS format example for CCD 1, 4, & 8:"
-        echo "1 4 8"
-        echo -n "Enter now:\n"
-        read ccd_response
+#     if [ "${ccd_response#*'_'}" = "auto" ] ;then
+#         mos_ccds_auto=true
+#     else
+#         echo
+#         echo "Enter CCDs on one line (This script does not yet validate CCD entry format)"
+#         echo "PN format example for CCD 1, 4, & 8:"
+#         echo "NOT IMPLEMENTED HERE YET"
+#         echo
+#         echo "MOS format example for CCD 1, 4, & 8:"
+#         echo "1 4 8"
+#         echo -n -e "Enter now:\n"
+#         read ccd_response
 
-        echo
-        echo "CCD string entered as:<${ccd_response}>"
+#         echo
+#         echo "CCD string entered as:<${ccd_response}>"
 
-        ccds="${ccd_response}"
-    fi
+#         ## *Assume* if "fov" is in region list its because no region is provided
+#         ## If no region is provided or reg file not found by <evselect>, it will default to FOV*
+#         ##   Actually for evselect it will not default to FOV, rmfgen will fail due to "unbounded regions"
+#         ## If no regions and ccds selected, adjust <region_list> to have ccd num(s)
+#         ## This will then be used later for the file naming suffix
 
-fi
+#         ## Actually need a per-detector ccd expression builder somewhere to handle this properly
+#         if [ "${region_list[0]}" = "fov" ] ;then
+#             region_list=("ccd_${ccd_response// /_}")
+#         fi
+
+#         ccds="${ccd_response}"
+#     fi
+
+# fi
 
 if [ "${response}" = "all" ] ;then
     echo
@@ -427,10 +469,13 @@ for f in "${event_suffix_files_found[@]}"; do
         #region_name="${reg%.*}"
 
         #region_selection_str="${1:-${reg}}"
+
         region_selection_str=$(<"${exposure_prefix}_${region}_physical.txt")
 
+        echo "Region:"
         echo $region
         echo
+        echo "Region Selection String:"
         echo $region_selection_str
         echo
 
@@ -439,10 +484,14 @@ for f in "${event_suffix_files_found[@]}"; do
         rmf_out_file="${spectra_prefix}_${region}.rmf"
         arf_out_file="${spectra_prefix}_${region}.arf"
         grppha_out_file="${spectra_prefix}_${region}_grp${group_min}.fits"
+        grppha_out_bkgsubbed_file="${spectra_prefix}_${region}_grp${group_min}_bkgsubbed.fits"
 
-        # Energy ranges used for filtering final output
+        # Energy ranges used for filtering final output; adjusted below by detector
         det_elo=0
-        det_ehi=12000
+        det_ehi=0
+
+        specchannelmin=0
+        specchannelmax=0
 
         event_pattern=""
         area_flag=""
@@ -459,6 +508,10 @@ for f in "${event_suffix_files_found[@]}"; do
                 det_ehi="${mos2_ehi}"
             fi
 
+            ## DO NOT CHANGE; should be 0-11999
+            specchannelmin=0
+            specchannelmax=11999
+
             event_pattern="${pattern_mos}"
             area_flag="${flag_mos_fov}"
 
@@ -467,6 +520,10 @@ for f in "${event_suffix_files_found[@]}"; do
             det_elo="${pn_elo}"
             det_ehi="${pn_ehi}"
 
+            ## DO NOT CHANGE; should be 0-20479
+            specchannelmin=0
+            specchannelmax=20479
+
             event_pattern="${pattern_pn_double_down}"
             area_flag="${flag_pn_fov}"
 
@@ -474,17 +531,16 @@ for f in "${event_suffix_files_found[@]}"; do
 
         #### ---
         ##
-            # Check for espfilt outputs and if found:
-            #   - Create images
-            #   - Apply low and high energy cutoffs to events list of cleaned espfilt output
+            # Extract the spectrum for the given region
             #   - Arguments after <expression> line are for output images of selection regions
+            #       ## These are to verify regions were properly selected
         ##
         ####
 
         evselect table="${event_file}" withspectrumset=yes spectrumset="${spec_out_file}" \
         energycolumn=PI spectralbinsize="${spectral_bin_size}" \
-        withspecranges=yes specchannelmin="${det_elo}" specchannelmax="${det_ehi}" \
-        expression="${event_pattern}&&${area_flag}${region_selection_str}" \
+        withspecranges=yes specchannelmin="${specchannelmin}" specchannelmax="${specchannelmax}" \
+        expression="(PI in [$det_elo:$det_ehi])&&${event_pattern}&&${area_flag}${region_selection_str}" \
         withimageset=yes imageset="${spec_out_file%.*}_im.fits" \
         ignorelegallimits=yes imagebinning=imageSize \
         xcolumn=X ximagesize=780 ximagemax=50000 ximagemin=1 \
@@ -507,15 +563,22 @@ for f in "${event_suffix_files_found[@]}"; do
         badpixlocation="${event_file}" detmaptype=flat extendedsource=yes &
         wait $!
 
-        ## 8.3.2 Grouping; https://heasarc.gsfc.nasa.gov/docs/asca/abc/node9.html
-        ## "Note that background files should not be grouped since XSPEC will
-        ##    automatically group the background to match the source data."
-        if [ "${region}" = "background" ] ;then continue ;fi
-        if [ ! -f "${bkg_file}" ] ;then continue ;fi
+        #### ---
+        ##
+            # Grouping spectra outputs:
+            #   - We will first group with no BACKFILE; both for background and source spectra
+            #   - If background subracting in XSPEC; DO NOT USE GROUPED background
+            #       ## 8.3.2 Grouping; https://heasarc.gsfc.nasa.gov/docs/asca/abc/node9.html
+            #       ## "Note that background files should not be grouped since XSPEC will
+            #       ##    automatically group the background to match the source data."
+            #   - If this loop is NOT background spectrum, and background spectra is found
+            #       ## create an additional src group adding background file for BACKSCALE
+        ##
+        ####
 
         grppha infile="${spec_out_file}" outfile=${grppha_out_file} \
         comm="chkey ANCRFILE ${arf_out_file} & chkey RESPFILE ${rmf_out_file} \
-        & chkey BACKFILE ${bkg_file} & group min ${group_min} & exit" \
+        & chkey BACKFILE none & group min ${group_min} & exit" \
         clobber=yes &
 
         wait $!
@@ -526,10 +589,30 @@ for f in "${event_suffix_files_found[@]}"; do
 
         wait $!
 
+        ### Check for BACKFILE
+        ## If current loop is extracting background spectrum, there is no BACKFILE; continue
+        if [ "${region}" = "background" ] ;then continue ;fi
+
+        ## If no background file is found, there is no BACKFILE; continue
+        if [ ! -f "${bkg_file}" ] ;then continue ;fi
+
+        grppha infile="${spec_out_file}" outfile=${grppha_out_bkgsubbed_file} \
+        comm="chkey ANCRFILE ${arf_out_file} & chkey RESPFILE ${rmf_out_file} \
+        & chkey BACKFILE ${bkg_file} & group min ${group_min} & exit" \
+        clobber=yes &
+
+        wait $!
+
+        ## Running again passing last input in and back out without changes
+        ##   to display updated information in the command line and see updated arf, rmf, bkg chkeys
+        grppha infile=${grppha_out_bkgsubbed_file} outfile=${grppha_out_bkgsubbed_file} comm="show all & exit" clobber=yes &
+
+        wait $!
+
 
         continue
 
-    done < "$region_files_list"
+    done
 
 done
 

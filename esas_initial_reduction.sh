@@ -16,7 +16,7 @@
 ##     to remake them since it is fast and the latest calibration and software versions will be used
 
 ## NOTE
-## chain vs proc result in identitical data outputs which differ only in output file names
+## chain vs proc result in identical data outputs which differ only in output file names
 ## From the ESAS Cookbook V21.0; 5.7
 
 ## Script start tagged by: <[^v^]>
@@ -95,22 +95,25 @@ fi
     # Energy ranges of final output fits files (applied after proton flare filtering)
     #   Note: espfilt does not limit energy range of output
     #         The ranges below are used to create new files over energy ranges of interest
+    # For full energy range;
+    #   - MOS 0-11999
+    #   - PN  0-20479
 ##
 ####
 
-mos1_elo=1500
-mos1_ehi=10000
+mos1_elo=0
+mos1_ehi=11999
 
-mos2_elo=1500
-mos2_ehi=10000
+mos2_elo=0
+mos2_ehi=11999
 
-pn_elo=500
-pn_ehi=10000
+pn_elo=0
+pn_ehi=20479
 
 
 #### ---
 ##
-    # Event pattern and detector region flags *** Not used yet
+    # Event pattern and detector region flags
 ##
 ####
 
@@ -409,11 +412,11 @@ create_event_file_images (){
     area_flag=""
 
     if [ "${instrume}" == "M" ] ;then
-        event_pattern="PATTERN <= 12"
-        area_flag="#XMMEA_EM" ## FOV only; Excludes corner events; (FLAG & 0x766aa000)==0 is entire FOV
+        event_pattern="${pattern_mos}"
+        area_flag="${flag_mos_fov}" ## FOV only; Excludes corner events; (FLAG & 0x766aa000)==0 is entire FOV
     elif [ "${instrume}" == "P" ] ;then
-        event_pattern="PATTERN <= 4"
-        area_flag="(FLAG & 0xfb0000)==0" ## FOV only; Excludes corner events; #XMMEA_EP is entire FOV
+        event_pattern="${pattern_pn_double_down}"
+        area_flag="${flag_pn_fov}" ## FOV only; Excludes corner events; #XMMEA_EP is entire FOV
     else
         echo "Detector undetermined for given event file"
         echo "File: ${fname}"
@@ -424,7 +427,7 @@ create_event_file_images (){
     preview_sky_prefix="${fname}-im-sky"
 
     evselect table="$1" withimageset=yes imageset="${preview_sky_prefix}.fits" \
-    filtertype=expression expression="($event_pattern)&&($area_flag)" \
+    filtertype=expression expression="${event_pattern}&&${area_flag}" \
     ignorelegallimits=yes imagebinning=imageSize \
     xcolumn=X ximagesize=780 ximagemax=50000 ximagemin=1 \
     ycolumn=Y yimagesize=780 yimagemax=50000 yimagemin=1 | tee "./_log_${preview_sky_prefix}_evselect.txt" &
@@ -435,7 +438,7 @@ create_event_file_images (){
     preview_det_prefix="${fname}-im-det"
 
     evselect table="$1" withimageset=yes imageset="${preview_det_prefix}.fits" \
-    filtertype=expression expression="($event_pattern)&&($area_flag)" \
+    filtertype=expression expression="${event_pattern}&&${area_flag}" \
     ignorelegallimits=yes imagebinning=imageSize \
     xcolumn=DETX ximagesize=780 ximagemax=19500 ximagemin=-19499 \
     ycolumn=DETY yimagesize=780 yimagemax=19500 yimagemin=-19499 | tee "./_log_${preview_det_prefix}_evselect.txt" &
@@ -743,9 +746,9 @@ for E in "${exposures[@]}"; do
     #arc_elo= ## Placeholder when I estimate energy ranges of arcing ***
     #arc_ehi=
 
-    # Energy ranges used for filtering final output
+    # Energy ranges used for filtering final output; adjusted below by detector
     det_elo=0
-    det_ehi=12000
+    det_ehi=0
 
     event_pattern=""
     area_flag=""
@@ -861,7 +864,7 @@ for E in "${exposures[@]}"; do
         ## Even if only interested in analysis >1.5 keV where anom state doesn't affect data,
         ##   also create images to check for scattering arcs (NOT YET IMPLEMENTED)
         evselect table="${in_file}" withimageset=yes imageset="${exposure_prefix}${diagn_suffix}".fits \
-        filtertype=expression expression="(PI in [$anom_elo:$anom_ehi])&&($event_pattern)&&($area_flag)" \
+        filtertype=expression expression="(PI in [${anom_elo}:${anom_ehi}])&&${event_pattern}&&${area_flag}" \
         ignorelegallimits=yes imagebinning=imageSize \
         xcolumn=DETX ximagesize=780 ximagemax=19500 ximagemin=-19499 \
         ycolumn=DETY yimagesize=780 yimagemax=19500 yimagemin=-19499 | tee "./_log_${exposure_prefix}_evselect.txt" &
@@ -921,7 +924,7 @@ for E in "${exposures[@]}"; do
         ## Creating preview images of PN at same energy range as MOS anomalous diagnostic images
         ##   *** Change this later since (most of) this range exclude double-pixel events (PATTERN == 0)
         evselect table="${in_file}" withimageset=yes imageset="${exposure_prefix}${diagn_suffix}".fits \
-        filtertype=expression expression="(PI in [$anom_elo:$anom_ehi])&&($event_pattern)&&($area_flag)" \
+        filtertype=expression expression="(PI in [${anom_elo}:${anom_ehi}])&&${event_pattern}&&${area_flag}" \
         ignorelegallimits=yes imagebinning=imageSize \
         xcolumn=DETX ximagesize=780 ximagemax=19500 ximagemin=-19499 \
         ycolumn=DETY yimagesize=780 yimagemax=19500 yimagemin=-19499 | tee "./_log_${exposure_prefix}_evselect.txt" &
@@ -929,7 +932,7 @@ for E in "${exposures[@]}"; do
         wait $!
 
         evselect table="${in_file_oot}" withimageset=yes imageset="${exposure_prefix_oot}${diagn_suffix}".fits \
-        filtertype=expression expression="(PI in [$anom_elo:$anom_ehi])&&($event_pattern)&&($area_flag)" \
+        filtertype=expression expression="(PI in [${anom_elo}:${anom_ehi}])&&${event_pattern}&&${area_flag}" \
         ignorelegallimits=yes imagebinning=imageSize \
         xcolumn=DETX ximagesize=780 ximagemax=19500 ximagemin=-19499 \
         ycolumn=DETY yimagesize=780 yimagemax=19500 yimagemin=-19499 | tee "./_log_${exposure_prefix_oot}_evselect.txt" &
@@ -986,7 +989,7 @@ for E in "${exposures[@]}"; do
 
         ## Applying elow/ehigh cutoffs to allevc
         evselect table="${exposure_allevc_out}":EVENTS withfilteredset=yes \
-        expression="(PI in [$det_elo:$det_ehi])&&($event_pattern)&&($area_flag)" \
+        expression="(PI in [${det_elo}:${det_ehi}])&&${event_pattern}&&${area_flag}" \
         filteredset="${detector}${EXPOSURE}-evc-cut.fits" filtertype=expression keepfilteroutput=yes
 
         ## *** store ELO/EHI in header for later processing, alongside EHIGH/ELOW stored by espfilt
@@ -1016,7 +1019,7 @@ for E in "${exposures[@]}"; do
 
         ## Applying elow/ehigh cutoffs to allevcoot
         evselect table="${detector}${EXPOSURE}-allevcoot.fits":EVENTS withfilteredset=yes \
-        expression="(PI in [$det_elo:$det_ehi])&&($event_pattern)&&($area_flag)" \
+        expression="(PI in [${det_elo}:${det_ehi}])&&${event_pattern}&&${area_flag}" \
         filteredset="${detector}${EXPOSURE}-evcoot-cut.fits" filtertype=expression keepfilteroutput=yes
 
         ## *** store ELO/EHI in header for later processing, alongside EHIGH/ELOW stored by espfilt

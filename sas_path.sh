@@ -1,147 +1,120 @@
 #!/bin/bash
 
 # Make sure to *source* and not just run script
-# $. sassyPath.sh
+# $. script.sh
 # NOT
-# $sassyPath.sh
+# $script.sh
 
-_CURRENT_DIR=${PWD##*/}
+## To be run **before** any other sas tasks,           ##
+##     after sas initialization in analysis directory  ##
 
-if [ $_CURRENT_DIR == "analysis" ]; then
+## This script prepares the working directory with an updated cif file and replaces ODF summary file
+## The respective SAS_CCF and SAS_ODF paths are also exported
 
-    export SAS_CCF="${PWD}/ccf.cif"
+## Script start tagged by: <[^v^]>
+## Warnings tagged by: <[*,*]>
 
-    pushd ..
-    _OBD_ID=${PWD##*/}
+_SCRIPT=$( basename "${BASH_SOURCE[0]}" )
+_SCRIPT_PATH=$( dirname "${BASH_SOURCE[0]}" )
+_CURRENT_DIR="${PWD##*/}"
+_PARENT_DIR="${PWD%/*}"
 
-    if [ -d "./odf" ]; then
-        pushd ./odf
-        export SAS_ODF="${PWD}/"
-        popd
+echo
+echo "<[^v^]>"
+echo "Executing script: ${_SCRIPT}"
+echo "From: ${_SCRIPT_PATH}"
+echo "In: ${_CURRENT_DIR}"
+echo "Of: ${_PARENT_DIR}"
+echo
+
+# Prompt user to check if current directory is acceptable to continue;
+# default is cookbook suggested "analysis" directory
+if [ "${_CURRENT_DIR}" != "analysis" ]; then
+
+    echo -n "Current directory is not 'analysis'. Continue anyway (y/n)?"
+    read response
+
+    if [ "$response" != "${response#[Yy]}" ] ;then
+        echo
+        echo "Continuing in current directory: ${_CURRENT_DIR}"
+        echo
+    else
+        echo
+        echo "<[*,*]> Opted NOT to continue in current directory: ${_CURRENT_DIR}"
+        echo "Please create an \"analysis\" directory to work from"
+        echo "Exiting"
+        echo
+        return 1 2> /dev/null || exit 1
     fi
 
-    popd
-
-    echo
-    echo "EXPORTED DIRECTORIES:"
-    echo "SAS_ODF="$SAS_ODF
-    echo "SAS_CCF="$SAS_CCF
-
-else
-    echo
-    echo "Current directory is not 'analysis'. Try again. ;)"
-    echo
 fi
 
-echo -n "Run from cifbuild thru to emproc (y/n)? "
-read answer
+export SAS_CCF="${PWD}/ccf.cif"
 
-if [ "$answer" != "${answer#[Yy]}" ] ;then # this grammar (the #[] operator) means that the variable $answer where any Y or y in 1st position will be dropped if they exist.
-    echo Yes
+#echo
+#echo "Changing to parent directory"
+#pushd ..
+#cd "${_PARENT_DIR}"
 
-    cifbuild withccfpath=no analysisdate=now category=XMMCCF calindexset=$SAS_CCF fullpath=yes
+# Check for and retrieve odf directory; exit if not found in parent directory
+if [ -d "${_PARENT_DIR}/odf" ]; then
+    echo
+    #echo "Pushing to odf directory"
+    #pushd ./odf
+    echo "odf directory found in parent of working directory"
+    echo "Exporting SAS_ODF as:"
+    echo "${_PARENT_DIR}/odf"
+    export SAS_ODF="${_PARENT_DIR}/odf"
+    echo
+    #echo "Popping to parent directory"
+    #popd
+else
+    echo
+    echo "<[*,*]> No odf directory found in parent of working directory"
+    echo "(where \"odf\" is expected to be lowercase)"
+    #echo "Popping back to working directory"
+    #popd
+    echo
+    echo "Exiting"
+    return 1 2> /dev/null || exit 1
+fi
 
-    wait $!
+#echo
+#echo "Popping to working directory"
+#popd
 
-    odfingest odfdir=$SAS_ODF outdir=$SAS_ODF
-
-    wait $!
-
-    epproc | tee ./_log_epproc.txt
-
-    wait $!
-
-    emproc | tee ./_log_emproc.txt
-
-    wait $!
-
-    # Get list of files containing *-obj-image-det-soft.fits
-    # For each one get instrument name, exposure id; save out detector soft band image
-    shopt -s nullglob
-    evtFiles=( *ImagingEvts.ds )
-    #echo ${evtFiles[@]}
-    for f in ${evtFiles[@]}; do
-        instrume=$(gethead INSTRUME "$f") # EMOS1, EMOS2, EPN
-        instrume="${instrume:1}" # MOS1, MOS2, PN
-        instrume=$(echo "$instrume" | tr '[:upper:]' '[:lower:]') # mos1, mos2, pn
-        expid=$(gethead EXPIDSTR "$f")
-
-        cp ./$f ./${instrume}_${expid}.fits
-        echo "Renamed events file to: ${instrume}_${expid}.fits"
-
-        wait $!
-
-        evselect table=$f withimageset=yes imageset=${instrume}_${expid}_image.fits \
-            xcolumn=X ycolumn=Y imagebinning=imageSize ximagesize=600 yimagesize=600
-        echo "Saved fits image as: ${instrume}_${expid}_image.fits"
-        wait $!
-
-        ds9 "./${instrume}_${expid}_image.fits" -scale log -cmap he -zoom to fit -saveimage png "./${instrume}_${expid}_image.png" -exit &
-        wait $!
-        echo "Saved image as: ${instrume}_${expid}_image.png"
-    done
-    shopt -u nullglob
-
-    wait $!
-
-    # #STANDARD FILTERS 6.3
-
-    # evselect table=MOS1_S001.fits withfilteredset=yes expression='(PATTERN <= 12)&&(PI in [200:12000])&&#XMMEA_EM' filteredset=EMOS1_S001_filt.fits filtertype=expression keepfilteroutput=yes updateexposure=yes filterexposure=yes
+echo
+echo "EXPORTED DIRECTORIES:"
+echo "SAS_CCF=${SAS_CCF}"
+echo "SAS_ODF=${SAS_ODF}"
+echo
 
 
-    # #CREATE AND DISPLAY A LIGHT CURVE 6.4
+echo
+echo -n "Run from cifbuild and odfingest (y/n)?"
+read response
 
-    # evselect table=MOS1_S001.fits withrateset=yes rateset=MOS1_S001_ltcrv.fits \
-    #     maketimecolumn=yes timecolumn=TIME timebinsize=100 makeratecolumn=yes
-        
-    # fv MOS1_S001_ltcrv.fits &
+# This grammar (the #[] operator) trims the first leading y or Y from the string
+# If a y or Y is removed from the start of the word, the compared arguments are different, and a "yes" intention is assumed
+# This means a "return" is considered a no for safety to avoid overwriting files accidentally
+if [ "${response}" != "${response#[Yy]}" ] ;then
 
-    # #APPLYING TIME FILTERS TO THE DATA 6.5
+    ## From the ESAS Cookbook V21.0; 5.6
+    echo
+    echo Preparing directory with updated cif file and replacing ODF summary file
+    echo
 
-    # tabgtigen table=MOS1_S001_ltcrv.fits gtiset=gtiset.fits timecolumn=TIME \
-    #     expression='(RATE <= 9)'
+    # Overwrites current cif.cif file in directory
+    cifbuild withccfpath=no analysisdate=now category=XMMCCF calindexset="${SAS_CCF}" fullpath=yes | tee ./_log_cifbuild.txt
 
-    # evselect table=MOS1_S001_filt.fits withfilteredset=yes \
-    #     expression='GTI(gtiset.fits,TIME)' filteredset=MOS1_S001_filt_time.fits \
-    #     filtertype=expression keepfilteroutput=yes \
-    #     updateexposure=yes filterexposure=yes
-
-    # #SOURCE DETECTION WITH edetect_chain 6.6
-
-    # atthkgen atthkset=attitude.fits timestep=1
-
-    # evselect table=MOS1_S001_filt_time.fits withimageset=yes imageset=MOS1_S001-s.fits imagebinning=binSize xcolumn=X ximagebinsize=22 ycolumn=Y yimagebinsize=22 filtertype=expression expression='(FLAG == 0)&&(PI in [300:2000])'
-
-    # edetect_chain imagesets='MOS1_S001-s.fits MOS1_S001-h.fits' eventsets='MOS1_S001_filt_time.fits' attitudeset=attitude.fits \ 
-    #     pimin='300 2000' pimax='2000 10000' likemin=10 witheexpmap=yes \
-    #     ecf='0.878 0.220' ebox1_list=eboxlist_1.fits \
-    #     eboxm_list=eboxlist_m.fits em1_list=em1list.fits esp_withootset=no
-
-    # srcdisplay boxlistset=em1list.fits imageset=MOS1_S001-s.fits  regionfile=regionfile.txt sourceradius=0.01 withregionfile=yes
-
-    # #EXTRACT THE SOURCE AND BACKGROUND SPECTRA 6.7
-
-    # evselect table='MOS1_S001_filt_time.fits' energycolumn='PI' withfilteredset=yes filteredset='MOS1_S001_filtered.fits' keepfilteroutput=yes filtertype='expression' expression='((X,Y) in CIRCLE(25553.5,23925.5,300))' withspectrumset=yes spectrumset='MOS1_S001_pi.fits' spectralbinsize=5 withspecranges=yes specchannelmin=0 specchannelmax=11999
-
-    # evselect table='MOS1_S001_filt_time.fits' energycolumn='PI' withfilteredset=yes filteredset='MOS1_S001_bkg_filtered.fits' keepfilteroutput=yes filtertype='expression' expression='((X,Y) in CIRCLE(25553.5,23925.5,1500))&&!((X,Y) in CIRCLE(25553.5,23925.5,500))' withspectrumset=yes spectrumset='MOS1_S001_bkg_pi.fits' spectralbinsize=5 withspecranges=yes specchannelmin=0 specchannelmax=11999
-
-    # #6.10
-
-    # backscale spectrumset=MOS1_S001_pi.fits badpixlocation=MOS1_S001_filt_time.fits
-
-    # backscale spectrumset=MOS1_S001_bkg_pi.fits badpixlocation=MOS1_S001_filt_time.fits
-
-    # #6.11
-
-    # rmfgen rmfset=MOS1_S001_rmf.fits spectrumset=MOS1_S001_pi.fits
-
-    # arfgen arfset=MOS1_S001_arf.fits spectrumset=MOS1_S001_pi.fits withrmfset=yes rmfset=MOS1_S001_rmf.fits withbadpixcorr=yes badpixlocation=MOS1_S001_filt_time.fits
-
-    # #13
-
-
+    # Remove *.SAS files included from original pipeline processing and rebuild them
+    rm "${SAS_ODF}"/*.SAS
+    odfingest odfdir="${SAS_ODF}" outdir="${SAS_ODF}" | tee ./_log_odfingest.txt
 
 else
-    echo No
+    echo
+    echo "<[*,*]> Opted not to run cifbuild and odfingest tasks"
+    echo "Exiting"
+    echo
     return 1 2> /dev/null || exit 1
 fi
