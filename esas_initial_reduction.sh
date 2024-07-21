@@ -242,6 +242,9 @@ fi
 # epchain package documentation recommends the following parameters and epchain order
 # The intermediate files are reused by the second epchain call,
 #   and then cleaned up by the second epchain call
+
+# NOTE: setting <odfaccess> to odfaccess=all enables epchain to process all found PN exposures,
+# as opposed to normal behavior of only first PN exposure (by default also limited to IMAGING exposures)
 if $run_epchain ;then
 
     ## Fixing (CONSTITUENT) error wg=hen running epchain in SAS v21.0;
@@ -264,7 +267,8 @@ if $run_epchain ;then
     epchain exposure=99 | tee "./_epchain_exposure_count_diagn.txt"
     ##
 
-    ## Running epchain twice
+
+    ## Running epchain twice per exposure
     ## Users Guide to the XMM-Newton Science Analysis System V17.0; 4.9
     ##   OoT events are recorded by PN between integration intervals when the CCD is readout
     ##   OoT events broaden spectral features and are wrongly reconstructed in PN images
@@ -272,21 +276,23 @@ if $run_epchain ;then
     ##   Simulating OoT events by this procedure is recommended "If highest spectral resolution is required"
     ##   Section 4.9.2 shows impact on spectra
 
-    epchain withoutoftime=Y keepintermediate=raw runradmonfix=N | tee "./_log_epchain_oot.txt"
+    epchain withoutoftime=Y keepintermediate=raw runradmonfix=N odfaccess=all | tee "./_log_epchain_oot.txt"
 
     # Check for output *PN*OOEVLI*.FIT
     if [ ! -f *PN*OOEVLI*.FIT ] ;then
         echo "<[*,*]> No Out-of-Time output from epchain"
     fi
 
-    epchain runradmonfix=N | tee "./_log_epchain.txt"
+    epchain runradmonfix=N odfaccess=all | tee "./_log_epchain.txt"
 
     # Check for output *PN*PIEVLI*.FIT
     if [ ! -f *PN*PIEVLI*.FIT ] ;then
         echo "<[*,*]> No output from epchain"
     fi
 
+
 fi
+
 
 # By default emchain runs both MOS detectors and all CCDs
 # These can be specified as follows:

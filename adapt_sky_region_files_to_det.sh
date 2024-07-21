@@ -78,7 +78,9 @@ while IFS= read -r line || [ -n "$line" ]; do
 
     for f in ${det_files[@]}; do
 
-        ./xmm_sky2det_regions.sh "$f" "$line.reg"
+        #./xmm_sky2det_regions.sh "$f" "$line.reg"
+        source $_SCRIPT_PATH/xmm_sky2det_regions.sh "$f" "$line.reg" &
+        wait $!
         echo
         echo "$line: ${f%%\-*}"
 

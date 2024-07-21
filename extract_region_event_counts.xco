@@ -1,9 +1,0 @@
-set datadir ./
-set mission xmm
-set instr emos1
-read events
-mos1S001-clean.fits
-filter region captest.reg
-filter pha_cutoff 109 547
-extract image
-plot image
