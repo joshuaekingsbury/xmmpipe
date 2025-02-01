@@ -23,13 +23,14 @@ To begin, the current working directory should be titled "analysis" and located 
 ### Script Adjustments
 - \<Any hardcoded changes that should be made prior to running?>
 ### Before Running Scripts
-1. Scripts may not behave properly if not in Bash shell
+1. Add the folder with these scripts to PATH
+2. Scripts may not behave properly if not executed in Bash shell
 	- ```$ echo $0```
 	- ```$ bash```
-2. Not necessary for general use of these scripts; if python version/env used for HEAsoft is from (Ana)Conda, and expecting to use PyXspec:
+3. Not necessary for general use of these scripts; if python version/env used for HEAsoft is from (Ana)Conda, and expecting to use PyXspec:
 	- activate (Ana)Conda before initializing HEAsoft.
-3. Initialize HEAsoft
-4. Initialize SAS
+4. Initialize HEAsoft
+5. Initialize SAS
 
 ## Begin Pipeline Processing
 
