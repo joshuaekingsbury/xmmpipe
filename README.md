@@ -1,6 +1,8 @@
 # xmmpipe
 
 Scripts for working through XMM-Newton observation processing pipelines
+\*\*Note: There is a limitation to number of regions that may be used for filtering if regions are passed to evselect as a boolean expression as this pipeline currently does.
+This limit is due to the fact that the expression is stored in the fits file header and is limited to 1024 char/bytes in length/size. There are work arounds I will implement in the future.
 
 ## Usage
 - EPIC detector (PN/MOS1/MOS2) exposures in IMAGING mode
@@ -78,6 +80,7 @@ Prior to this step, if Soft Proton Filtering was carried out manually:
 
 ### Region Conversion
 Need to convert regions from ds9 to xmm-pipeline compatible
+WARNING\*\*: See note at top regarding region boolean logic string limitations (1024 char/bytes) in processing steps to region conversion
 
 Uses text file ```../analysis/reg_files.txt``` with each line a single ds9 sky region file name string without file extension
 
@@ -126,7 +129,12 @@ ds9(){
 ### Source Detection\*\* (\*\*Work in Progress; this step can be skipped and source detection can be done manually; will be adjusted in the future)
 Prompt options for which detector(s) to use for running edetect_chain on multiple energy bands
 - WARNING: \*\*Currently edetect_chain part of script is hardcoded to exposure names used for testing and assumes pn, mos1, mos2 are all to be used
+- WARNING: \*\*srcdisplay requires ds9 installed and accessible via commandline, will not with ds9 bash function mentioned above; regions are saved by this stage though so they can be viewed manually in ds9
 - WARNING: \*\*Currently srcdisplay assumes pn image exists and is to be used for previewing point sources
+
 ```
 $ . esas_source_bands.sh
 ```
+
+### Region Boolean Strings Limitations
+evselect can only accept a boolean logic string for regions with a length/size of 1024 char/bytes. There are other ways to ignore or circumvent this region limit restriction that will be detailed at a later time.
