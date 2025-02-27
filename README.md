@@ -42,7 +42,7 @@ Exports SAS_CCF and SAS_ODF, updates cif file, and replaces ODF summary file
 $ . sas_path.sh
 ```
 
-### Initial reduction
+### Initial Reduction
 Prompt options for choosing detector(s) and CCDs (MOS only)
 - Currently, all exposures for any/all detectors selected during prompting are processed
 - logs are recorded of each process and stored in ```../analysis/logs```
@@ -52,6 +52,7 @@ Prompt options for choosing detector(s) and CCDs (MOS only)
 ```
 $ . esas_initial_reduction.sh
 ```
+
 ### Manual Soft Proton Flare (SPF) Filtering
 In the case where \<espfilt\> does not work, the interactive script below will use a combination of prompts and ```fv``` tool for manual filtering.
 
@@ -121,5 +122,11 @@ ds9(){
 		- Re-adding to basket, selecting "Retrieve data in TAR.GZ format" (instead of default TAR), and redownloading from new archive link on a different network downloaded properly and allowed for reduction
 	- With the other troublesome observation, it was downloaded as part of a group of other observations. No other observations from the same TAR file had issues in processing. Observation failed epchain and emchain again after re-downloading from new archive request. As observation was short and much other data existed, troubleshooting this observation further was reserved for a future time. [0112280101]
 
-## Potential Future Work
-### Scripts for Source Detection
+## Future Work
+### Source Detection\*\* (\*\*Work in Progress; this step can be skipped and source detection can be done manually; will be adjusted in the future)
+Prompt options for which detector(s) to use for running edetect_chain on multiple energy bands
+- WARNING: \*\*Currently edetect_chain part of script is hardcoded to exposure names used for testing and assumes pn, mos1, mos2 are all to be used
+- WARNING: \*\*Currently srcdisplay assumes pn image exists and is to be used for previewing point sources
+```
+$ . esas_source_bands.sh
+```
