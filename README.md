@@ -1,6 +1,7 @@
 # xmmpipe
 
 Scripts for working through XMM-Newton observation processing pipelines
+
 \*\*Note: There is a limitation to number of regions that may be used for filtering if regions are passed to evselect as a boolean expression as this pipeline currently does.
 This limit is due to the fact that the expression is stored in the fits file header and is limited to 1024 char/bytes in length/size. There are work arounds I will implement in the future.
 
@@ -80,7 +81,8 @@ Prior to this step, if Soft Proton Filtering was carried out manually:
 
 ### Region Conversion
 Need to convert regions from ds9 to xmm-pipeline compatible
-WARNING\*\*: See note at top regarding region boolean logic string limitations (1024 char/bytes) in processing steps to region conversion
+
+WARNING\*\*: See note at top regarding region boolean logic string limitations (1024 char/bytes) in processing steps subsequent to region conversion
 
 Uses text file ```../analysis/reg_files.txt``` with each line a single ds9 sky region file name string without file extension
 
