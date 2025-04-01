@@ -2,8 +2,8 @@
 
 Scripts for working through XMM-Newton observation processing pipelines
 
-\*\*Note: There is a limitation to number of regions that may be used for filtering if regions are passed to evselect as a boolean expression as this pipeline currently does.
-This limit is due to the fact that the expression is stored in the fits file header and is limited to 1024 char/bytes in length/size. There are work arounds I will implement in the future.
+\*\*Note: There is a limitation to number of regions that may be used for filtering if regions are passed to \<[pn][mos]spectra\> as a boolean expression as this pipeline currently does.
+This limit is due to the fact that the expression is stored in the fits file header and is limited to 1024 char/bytes in length/size. There are work arounds I will implement in the future. NOTE: \<evselect\> does not have this limitation
 
 ## Usage
 - EPIC detector (PN/MOS1/MOS2) exposures in IMAGING mode
@@ -139,4 +139,4 @@ $ . esas_source_bands.sh
 ```
 
 ### Region Boolean Strings Limitations
-evselect can only accept a boolean logic string for regions with a length/size of 1024 char/bytes. There are other ways to ignore or circumvent this region limit restriction that will be detailed at a later time.
+\<[pn][mos]spectra\> can only accept a boolean logic string for regions with a length/size of 1024 char/bytes. There are other ways to ignore or circumvent this region limit restriction that will be detailed at a later time.
