@@ -104,7 +104,7 @@ if [ "${response}" != "${response#[Yy]}" ] ;then
     echo Preparing directory with updated cif file and replacing ODF summary file
     echo
 
-    # Overwrites current cif.cif file in directory
+    # Overwrites current ccf.cif file in directory
     cifbuild withccfpath=no analysisdate=now category=XMMCCF calindexset="${SAS_CCF}" fullpath=yes | tee ./_log_cifbuild.txt
 
     # Remove *.SAS files included from original pipeline processing and rebuild them

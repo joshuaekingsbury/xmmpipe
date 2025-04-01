@@ -414,7 +414,7 @@ atthk_file=atthk.fits
 atthkgen atthkset="${atthk_file}" timestep=1
 
 #Looking at only the 0.2-2.0 keV energy range
-edetect_chain eventsets="pnS001-allevc.fits mos1S002-allevc.fits mos2S003-allevc.fits" \
+edetect_chain eventsets="pnS003-allevc.fits mos1S001-allevc.fits mos2S002-allevc.fits" \
     imagesets="pn_image_b1.fits pn_image_b2.fits pn_image_b3.fits \
                m1_image_b1.fits m1_image_b2.fits m1_image_b3.fits \
                m2_image_b1.fits m2_image_b2.fits m2_image_b3.fits" \
@@ -429,7 +429,7 @@ edetect_chain eventsets="pnS001-allevc.fits mos1S002-allevc.fits mos2S003-allevc
 wait $!
 
 #Looking at only the 2.0-10.0 keV energy range
-edetect_chain eventsets="pnS001-allevc.fits mos1S002-allevc.fits mos2S003-allevc.fits" \
+edetect_chain eventsets="pnS003-allevc.fits mos1S001-allevc.fits mos2S002-allevc.fits" \
     imagesets="pn_image_b4.fits pn_image_b5.fits \
                m1_image_b4.fits m1_image_b5.fits \
                m2_image_b4.fits m2_image_b5.fits" \
@@ -444,7 +444,7 @@ edetect_chain eventsets="pnS001-allevc.fits mos1S002-allevc.fits mos2S003-allevc
 wait $!
 
 #Looking at the full 0.2-10.0 keV energy range
-edetect_chain eventsets="pnS001-allevc.fits mos1S002-allevc.fits mos2S003-allevc.fits" \
+edetect_chain eventsets="pnS003-allevc.fits mos1S001-allevc.fits mos2S002-allevc.fits" \
     imagesets="pn_image_b1.fits pn_image_b2.fits pn_image_b3.fits pn_image_b4.fits pn_image_b5.fits\
                m1_image_b1.fits m1_image_b2.fits m1_image_b3.fits m1_image_b4.fits m1_image_b5.fits\
                m2_image_b1.fits m2_image_b2.fits m2_image_b3.fits m2_image_b4.fits m2_image_b5.fits" \

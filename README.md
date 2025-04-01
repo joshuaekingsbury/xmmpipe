@@ -1,6 +1,6 @@
 # xmmpipe
 
-Scripts for working through XMM-Newton observation processing pipelines
+Scripts for working through XMM-Newton observation processing pipelines for extended sources
 
 \*\*Note: There is a limitation to number of regions that may be used for filtering if regions are passed to \<[pn][mos]spectra\> as a boolean expression as this pipeline currently does.
 This limit is due to the fact that the expression is stored in the fits file header and is limited to 1024 char/bytes in length/size. There are work arounds I will implement in the future. NOTE: \<evselect\> does not have this limitation

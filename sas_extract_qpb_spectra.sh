@@ -75,8 +75,8 @@ fi
 ##
 ####
 
-if [ ! -d spectra ]; then
-    mkdir spectra
+if [ ! -d spectra_qpb ]; then
+    mkdir spectra_qpb
 fi
 
 obs_id=""
@@ -349,7 +349,7 @@ echo "Selecting event files ending with \"${evc_suffix}\" (.fits)"
 echo
 
 # Check for files ending with suffix selection
-event_suffix_files_found=($( find . -maxdepth 1 -type f -name "*${evc_suffix}.fits" ))
+event_suffix_files_found=($( find . -maxdepth 1 -type f -name "*qpb*${evc_suffix}.fits" ))
 if [[ -n "${event_suffix_files_found[@]}" ]]; then
     echo
     echo "Event files found:"
@@ -357,7 +357,7 @@ if [[ -n "${event_suffix_files_found[@]}" ]]; then
     echo
 else
     echo
-    echo "<[*,*]> No event files found matching pattern "'*'"${evc_suffix}"'.fits'
+    echo "<[*,*]> No event files found matching pattern "'*'qpb'*'"${evc_suffix}"'.fits'
     echo "Cannot continue without event files"
     echo "Exiting"
     echo
@@ -479,12 +479,12 @@ for f in "${event_suffix_files_found[@]}"; do
         echo $region_selection_str
         echo
 
-        spec_out_file="${spectra_prefix}_${region}.fits"
-        bkg_file="${spectra_prefix}_background.fits"
-        rmf_out_file="${spectra_prefix}_${region}.rmf"
-        arf_out_file="${spectra_prefix}_${region}.arf"
-        grppha_out_file="${spectra_prefix}_${region}_grp${group_min}.fits"
-        grppha_out_bkgsubbed_file="${spectra_prefix}_${region}_grp${group_min}_bkgsubbed.fits"
+        spec_out_file="${spectra_prefix}_${region}.qpb"
+        # bkg_file="${spectra_prefix}_background.fits"
+        # rmf_out_file="${spectra_prefix}_${region}.rmf"
+        # arf_out_file="${spectra_prefix}_${region}.arf"
+        # grppha_out_file="${spectra_prefix}_${region}_grp${group_min}.fits"
+        # grppha_out_bkgsubbed_file="${spectra_prefix}_${region}_grp${group_min}_bkgsubbed.fits"
 
         # Energy ranges used for filtering final output; adjusted below by detector
         det_elo=0
@@ -495,11 +495,6 @@ for f in "${event_suffix_files_found[@]}"; do
 
         event_pattern=""
         area_flag=""
-
-        # Setting binning of rmf for the case where spectra are to be merged
-        # https://www.cosmos.esa.int/web/xmm-newton/sas-thread-epic-merging
-        maxenergy=0
-        nbins=0
 
         if [ "${detector}" = "mos1" ] || [ "${detector}" = "mos2" ] ;then
 
@@ -520,9 +515,6 @@ for f in "${event_suffix_files_found[@]}"; do
             event_pattern="${pattern_mos}"
             area_flag="${flag_mos_fov}"
 
-            maxenergy=12
-            nbins=1190
-
         elif [ "${detector}" = "pn" ] ;then
 
             det_elo="${pn_elo}"
@@ -534,9 +526,6 @@ for f in "${event_suffix_files_found[@]}"; do
 
             event_pattern="${pattern_pn_double_down}"
             area_flag="${flag_pn_fov}"
-
-            maxenergy=15
-            nbins=1490
 
         fi
 
@@ -555,27 +544,25 @@ for f in "${event_suffix_files_found[@]}"; do
         withimageset=yes imageset="${spec_out_file%.*}_im.fits" \
         ignorelegallimits=yes imagebinning=imageSize \
         xcolumn=X ximagesize=780 ximagemax=50000 ximagemin=1 \
-        ycolumn=Y yimagesize=780 yimagemax=50000 yimagemin=1 &
+        ycolumn=Y yimagesize=780 yimagemax=50000 yimagemin=1 \
+        zcolumn="EWEIGHT" &
 
         ## The "&" after evselect assigns evselect to a background process
         ## The background process is retrieved from the $! env variable
         ## We can then wait for the background process to finish before running ds9
         wait $!
 
-        mv ${spec_out_file%.*}_im.fits spectra
+        mv ${spec_out_file%.*}_im.fits spectra_qpb
 
         backscale spectrumset="${spec_out_file}" badpixlocation="${event_file}" &
         wait $!
 
-        # Added energybin args to setup spectra for merging
-        # https://www.cosmos.esa.int/web/xmm-newton/sas-thread-epic-merging
-        rmfgen spectrumset="${spec_out_file}" rmfset="${rmf_out_file}" \
-        withenergybins=yes energymin=0.1  energymax="${maxenergy}" nenergybins="${nbins}" &
-        wait $!
+        # rmfgen spectrumset="${spec_out_file}" rmfset="${rmf_out_file}" &
+        # wait $!
 
-        arfgen spectrumset="${spec_out_file}" arfset="${arf_out_file}" withrmfset=yes rmfset="${rmf_out_file}" \
-        badpixlocation="${event_file}" detmaptype=flat extendedsource=yes &
-        wait $!
+        # arfgen spectrumset="${spec_out_file}" arfset="${arf_out_file}" withrmfset=yes rmfset="${rmf_out_file}" \
+        # badpixlocation="${event_file}" detmaptype=flat extendedsource=yes &
+        # wait $!
 
         #### ---
         ##
@@ -590,38 +577,38 @@ for f in "${event_suffix_files_found[@]}"; do
         ##
         ####
 
-        grppha infile="${spec_out_file}" outfile=${grppha_out_file} \
-        comm="chkey ANCRFILE ${arf_out_file} & chkey RESPFILE ${rmf_out_file} \
-        & chkey BACKFILE none & group min ${group_min} & exit" \
-        clobber=yes &
+        # grppha infile="${spec_out_file}" outfile=${grppha_out_file} \
+        # comm="chkey ANCRFILE ${arf_out_file} & chkey RESPFILE ${rmf_out_file} \
+        # & chkey BACKFILE none & group min ${group_min} & exit" \
+        # clobber=yes &
 
-        wait $!
+        # wait $!
 
-        ## Running again passing last input in and back out without changes
-        ##   to display updated information in the command line and see updated arf, rmf, bkg chkeys
-        grppha infile=${grppha_out_file} outfile=${grppha_out_file} comm="show all & exit" clobber=yes &
+        # ## Running again passing last input in and back out without changes
+        # ##   to display updated information in the command line and see updated arf, rmf, bkg chkeys
+        # grppha infile=${grppha_out_file} outfile=${grppha_out_file} comm="show all & exit" clobber=yes &
 
-        wait $!
+        # wait $!
 
-        ### Check for BACKFILE
-        ## If current loop is extracting background spectrum, there is no BACKFILE; continue
-        if [ "${region}" = "background" ] ;then continue ;fi
+        # ### Check for BACKFILE
+        # ## If current loop is extracting background spectrum, there is no BACKFILE; continue
+        # if [ "${region}" = "background" ] ;then continue ;fi
 
-        ## If no background file is found, there is no BACKFILE; continue
-        if [ ! -f "${bkg_file}" ] ;then continue ;fi
+        # ## If no background file is found, there is no BACKFILE; continue
+        # if [ ! -f "${bkg_file}" ] ;then continue ;fi
 
-        grppha infile="${spec_out_file}" outfile=${grppha_out_bkgsubbed_file} \
-        comm="chkey ANCRFILE ${arf_out_file} & chkey RESPFILE ${rmf_out_file} \
-        & chkey BACKFILE ${bkg_file} & group min ${group_min} & exit" \
-        clobber=yes &
+        # grppha infile="${spec_out_file}" outfile=${grppha_out_bkgsubbed_file} \
+        # comm="chkey ANCRFILE ${arf_out_file} & chkey RESPFILE ${rmf_out_file} \
+        # & chkey BACKFILE ${bkg_file} & group min ${group_min} & exit" \
+        # clobber=yes &
 
-        wait $!
+        # wait $!
 
-        ## Running again passing last input in and back out without changes
-        ##   to display updated information in the command line and see updated arf, rmf, bkg chkeys
-        grppha infile=${grppha_out_bkgsubbed_file} outfile=${grppha_out_bkgsubbed_file} comm="show all & exit" clobber=yes &
+        # ## Running again passing last input in and back out without changes
+        # ##   to display updated information in the command line and see updated arf, rmf, bkg chkeys
+        # grppha infile=${grppha_out_bkgsubbed_file} outfile=${grppha_out_bkgsubbed_file} comm="show all & exit" clobber=yes &
 
-        wait $!
+        # wait $!
 
 
         continue
